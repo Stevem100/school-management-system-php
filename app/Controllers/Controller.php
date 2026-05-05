@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use Core\Controller;
+use Core\Controller as CoreController;
 use Core\Session;
 
 /**
@@ -13,7 +13,7 @@ use Core\Session;
  * Extends the Core\Controller with layout rendering support.
  * All admin module controllers extend this class.
  */
-class Controller extends Controller
+class Controller extends CoreController
 {
     /**
      * Render a view within the application layout.

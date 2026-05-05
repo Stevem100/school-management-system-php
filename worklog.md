@@ -27,3 +27,22 @@ Stage Summary:
 - 3 SQL/DB schema fixes applied (sessions.is_active, users.password→password_hash, seed data)
 - 3 controller files fixed for password hashing consistency (UserController, StudentController, ProfileController)
 - All views use consistent styling: Tailwind CSS dark mode, emerald accent, card-based layout, back navigation
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix fatal PHP errors — Controller class name conflict and missing BASE_PATH constant
+
+Work Log:
+- Diagnosed "Cannot declare class App\Controllers\Controller because the name is already in use" error
+- Root cause: `app/Controllers/Controller.php` had `use Core\Controller;` followed by `class Controller extends Controller` — PHP rejects this because `Controller` is already used as an import alias
+- Fix: Changed `use Core\Controller` to `use Core\Controller as CoreController` and updated `class Controller extends CoreController`
+- Discovered 7 other controllers (TimetableController, AttendanceController, SkillController, SubjectController, ExamController, ClassController, ResultController) had `use Core\Controller;` which made them bypass `App\Controllers\Controller` and extend `Core\Controller` directly
+- Removed `use Core\Controller;` from all 7 controllers so they properly extend `App\Controllers\Controller`
+- Found `BASE_PATH` constant was used in `core/Controller.php` but never defined
+- Added `define('BASE_PATH', __DIR__);` to `index.php` before all core file loading
+
+Stage Summary:
+- Fixed fatal "class already in use" error in `app/Controllers/Controller.php`
+- Fixed 7 controllers that were incorrectly extending `Core\Controller` instead of `App\Controllers\Controller`
+- Added missing `BASE_PATH` constant definition in `index.php`
