@@ -1,0 +1,14 @@
+*
+!.gitignore
+!index.php
+!.htaccess
+!.env.example
+!README.md
+!config/
+!core/
+!routes/
+!app/
+!views/
+!public/
+!setup.sql
+!seed-data.sql
