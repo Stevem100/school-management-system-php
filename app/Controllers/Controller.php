@@ -29,7 +29,7 @@ class Controller extends CoreController
     protected function renderWithLayout(string $viewPath, array $data = []): void
     {
         $user = Session::get('user');
-        $userRoles = Session::get('user_roles', []);
+        $userRoles = Session::get('roles', []);
         $currentPage = $data['currentPage'] ?? '';
 
         // Build flash messages
