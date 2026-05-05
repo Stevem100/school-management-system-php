@@ -87,10 +87,25 @@ class ReportController extends Controller
         $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
+        $examId = $this->input('exam_id', '');
+        $classId = $this->input('class_id', '');
+        $subjectId = $this->input('subject_id', '');
+
+        $filters = [];
+        if (!empty($examId)) {
+            $filters['examId'] = ['eq' => $examId];
+        }
+        if (!empty($classId)) {
+            $filters['classId'] = ['eq' => $classId];
+        }
+        if (!empty($subjectId)) {
+            $filters['subjectId'] = ['eq' => $subjectId];
+        }
+
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = 50;
 
-        $result = $this->paginate('exam_results', $page, $perPage, [], 'created_at.desc');
+        $result = $this->paginate('exam_results', $page, $perPage, $filters, 'created_at.desc');
 
         $this->renderWithLayout('reports.index', [
             'pageTitle'   => 'Academic Results Report',
