@@ -21,6 +21,22 @@ Router::get('/', function () {
     if (isLoggedIn()) {
         redirect('/dashboard');
     }
+    // Check if public website is active
+    $db = new \Core\Database(
+        (string) config('db_host', 'localhost'),
+        (string) config('db_port', '3306'),
+        (string) config('db_name', 'school_erp'),
+        (string) config('db_user', 'root'),
+        (string) config('db_password', '')
+    );
+    try {
+        $ws = $db->single('website_settings', ['isActive' => ['eq' => 1]]);
+        if ($ws) {
+            redirect('/p');
+        }
+    } catch (\RuntimeException $e) {
+        // Table may not exist yet, fall through
+    }
     redirect('/login');
 });
 
@@ -281,3 +297,54 @@ Router::get('/profile', 'ProfileController@index');
 Router::post('/profile', 'ProfileController@update');
 Router::get('/settings', 'SettingController@index');
 Router::post('/settings', 'SettingController@update');
+
+// ─── Website Management (Admin) ─────────────────────────────────────────────
+
+Router::get('/website', 'WebsiteController@index');
+Router::get('/website/settings', 'WebsiteController@settings');
+Router::post('/website/settings', 'WebsiteController@saveSettings');
+Router::get('/website/pages', 'WebsiteController@pages');
+Router::get('/website/pages/create', 'WebsiteController@createPage');
+Router::post('/website/pages', 'WebsiteController@storePage');
+Router::get('/website/pages/{id}/edit', 'WebsiteController@editPage');
+Router::post('/website/pages/{id}', 'WebsiteController@updatePage');
+Router::post('/website/pages/{id}/delete', 'WebsiteController@deletePage');
+Router::get('/website/menu', 'WebsiteController@menu');
+Router::post('/website/menu', 'WebsiteController@addMenuItem');
+Router::post('/website/menu/{id}', 'WebsiteController@updateMenuItem');
+Router::post('/website/menu/{id}/delete', 'WebsiteController@deleteMenuItem');
+Router::get('/website/media', 'WebsiteController@media');
+Router::post('/website/media/upload', 'WebsiteController@uploadMedia');
+Router::post('/website/media/{id}/delete', 'WebsiteController@deleteMedia');
+Router::post('/website/toggle', 'WebsiteController@toggleWebsite');
+Router::post('/website/pages/{id}/publish', 'WebsiteController@publishPage');
+Router::get('/website/preview/{slug}', 'WebsiteController@previewPage');
+
+// ─── Admission Management (Admin) ───────────────────────────────────────────
+
+Router::get('/admission', 'AdmissionController@index');
+Router::get('/admission/settings', 'AdmissionController@settings');
+Router::post('/admission/settings', 'AdmissionController@saveSettings');
+Router::get('/admission/fields', 'AdmissionController@fields');
+Router::get('/admission/fields/create', 'AdmissionController@addField');
+Router::post('/admission/fields', 'AdmissionController@storeField');
+Router::get('/admission/fields/{id}/edit', 'AdmissionController@editField');
+Router::post('/admission/fields/{id}', 'AdmissionController@updateField');
+Router::post('/admission/fields/{id}/delete', 'AdmissionController@deleteField');
+Router::get('/admission/applications', 'AdmissionController@applications');
+Router::get('/admission/applications/{id}', 'AdmissionController@showApplication');
+Router::post('/admission/applications/{id}/review', 'AdmissionController@reviewApplication');
+Router::post('/admission/applications/{id}/delete', 'AdmissionController@deleteApplication');
+Router::post('/admission/toggle', 'AdmissionController@toggleAdmission');
+Router::get('/admission/export', 'AdmissionController@exportApplications');
+
+// ─── Public Website Routes ──────────────────────────────────────────────────
+
+Router::get('/p', 'WebsiteController@publicHome');
+Router::get('/p/about', 'WebsiteController@publicAbout');
+Router::get('/p/contact', 'WebsiteController@publicContact');
+Router::get('/p/classes', 'WebsiteController@publicClasses');
+Router::get('/p/admission', 'AdmissionController@form');
+Router::post('/p/admission', 'AdmissionController@submitApplication');
+Router::get('/p/admission/thank-you', 'AdmissionController@thankYou');
+Router::get('/p/page/{slug}', 'WebsiteController@publicPage');
