@@ -13,6 +13,28 @@ declare(strict_types=1);
 |
 */
 
+// ─── Load .env file ─────────────────────────────────────────────────────────
+
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (empty($line) || str_starts_with($line, '#')) continue;
+        if (strpos($line, '=') !== false) {
+            [$key, $value] = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            // Remove surrounding quotes
+            if (preg_match('/^["\'](.*)["\']\s*$/', $value, $matches)) {
+                $value = $matches[1];
+            }
+            putenv("$key=$value");
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
 // ─── Error Reporting ─────────────────────────────────────────────────────────
 
 // Load config early for debug mode
@@ -62,9 +84,9 @@ foreach ($coreFiles as $file) {
 
 spl_autoload_register(function (string $class): void {
     $prefixes = [
-        'App\\Controllers\\' => __DIR__ . '/controllers/',
-        'App\\Models\\'      => __DIR__ . '/models/',
-        'App\\Middleware\\'  => __DIR__ . '/middleware/',
+        'App\\Controllers\\' => __DIR__ . '/app/Controllers/',
+        'App\\Models\\'      => __DIR__ . '/app/Models/',
+        'App\\Middleware\\'  => __DIR__ . '/app/Middleware/',
     ];
 
     foreach ($prefixes as $prefix => $baseDir) {
