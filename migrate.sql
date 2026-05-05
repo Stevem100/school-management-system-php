@@ -2,14 +2,14 @@
 -- Run this on an existing database to apply schema updates
 -- Usage: mysql -u root school_erp < migrate.sql
 
-SET NAMES utf8mb4;
+SET NAMES utf8mb8mb4;
 
 -- 1. Add missing columns to notifications table
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_id INT UNSIGNED AFTER user_id;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_id INT UNSIGNED AFTER sender_id;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS priority VARCHAR(255) DEFAULT 'medium' AFTER channel;
 ALTER TABLE notifications ADD INDEX IF NOT EXISTS idx_notifications_recipient (recipient_id);
-ALTER TABLE notifications ADD INDEX IF NOT EXISTS idx_notifications_sender (sender_id);
+ALTER TABLE IF NOT EXISTS idx_notifications_sender (sender_id);
 
 -- 2. Add missing columns to modules table
 ALTER TABLE modules ADD COLUMN IF NOT EXISTS display_name VARCHAR(255) AFTER name;
@@ -38,3 +38,45 @@ VALUES
   ('branches', 'Branches', 'Branch and campus management', '🏢', '/branches', '1.0.0', 13, 1, 1),
   ('users', 'Users', 'User account management', '👥', '/users', '1.0.0', 14, 1, 1),
   ('roles', 'Roles', 'Role and permission management', '🛡️', '/roles', '1.0.0', 15, 1, 1);
+
+-- 5. Add missing columns to classes table
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS grade_level VARCHAR(255) DEFAULT '' AFTER capacity;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS section VARCHAR(255) DEFAULT '' AFTER grade_level;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(255) DEFAULT '' AFTER section;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_teacher_id INT UNSIGNED DEFAULT NULL AFTER academic_year;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active' AFTER class_teacher_id;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER created_at;
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS branch_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER school_id;
+
+-- 6. Add missing attendance table (if not exists)
+CREATE TABLE IF NOT EXISTS attendance (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  school_id INT UNSIGNED DEFAULT 0,
+  branch_id INT UNSIGNED DEFAULT 0,
+  student_id INT UNSIGNED NOT NULL,
+  class_id INT UNSIGNED DEFAULT NULL,
+  date DATE NOT NULL,
+  status VARCHAR(50) DEFAULT 'present' COMMENT 'present|absent|late|excused',
+  remarks TEXT,
+  recorded_by INT UNSIGNED DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_attendance_student (student_id),
+  INDEX idx_attendance_class (class_id),
+  INDEX idx_attendance_date (date),
+  INDEX idx_attendance_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 7. Add missing student_parents table (if not exists)
+CREATE TABLE IF NOT EXISTS student_parents (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  student_id INT UNSIGNED NOT NULL,
+  parent_id INT UNSIGNED NOT NULL,
+  relationship VARCHAR(100) DEFAULT 'guardian',
+  is_primary_guardian TINYINT(1) DEFAULT 0,
+  can_pickup TINYINT(1) DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sp_student (student_id),
+  INDEX idx_sp_parent (parent_id),
+  UNIQUE KEY uk_student_parent (student_id, parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

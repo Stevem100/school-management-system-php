@@ -141,7 +141,6 @@
       <div class="mt-2">
         <code class="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 px-1.5 py-0.5 rounded">/<?= e($route) ?></code>
       </div>
-      <?php endif; ?>
 
       <!-- Roles with access -->
       <?php if (!empty($roles) && !empty($rolePermissions)): ?>

@@ -57,12 +57,18 @@ class ReportController extends Controller
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = 50;
 
-        $result = $this->paginate('students', $page, $perPage, $filters, 'name.asc');
+        // Use raw SQL to query users table with student_profiles
+        $sql = "SELECT u.id, u.first_name, u.last_name, u.email, u.status, sp.admission_no, u.created_at\n                FROM users u LEFT JOIN student_profiles sp ON u.id = sp.user_id\n                WHERE u.userType = 'student'";
+        $params = [];
+        if (!empty($status)) { $sql .= ' AND u.status = ?'; $params[] = $status; }
+        if (!empty($search)) { $sql .= ' AND (u.first_name LIKE ? OR u.last_name LIKE ? OR sp.admission_no LIKE ?)'; $p = '%' . $search . '%'; $params[] = $p; $params[] = $p; $params[] = $p; }
+        $sql .= ' ORDER BY u.first_name ASC LIMIT ' . $perPage . ' OFFSET ' . (($page - 1) * $perPage);
+        $reportRows = $this->db->raw($sql, $params);
 
         $this->renderWithLayout('reports.index', [
             'pageTitle'   => 'Student Enrollment Report',
             'currentPage' => 'reports',
-            'reportData'  => $result['data'],
+            'reportData'  => $reportRows,
             'reportType'  => 'enrollment',
             'reportTitle' => 'Student Enrollment Report',
             'filters'     => ['class_id' => $classId, 'status' => $status, 'search' => $search],
@@ -78,25 +84,10 @@ class ReportController extends Controller
         $this->requireAuth();
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
-        $filters = [];
-        $examId = $this->input('exam_id', '');
-        $classId = $this->input('class_id', '');
-        $subjectId = $this->input('subject_id', '');
-
-        if (!empty($examId)) {
-            $filters['exam_id'] = ['eq' => $examId];
-        }
-        if (!empty($classId)) {
-            $filters['class_id'] = ['eq' => $classId];
-        }
-        if (!empty($subjectId)) {
-            $filters['subject_id'] = ['eq' => $subjectId];
-        }
-
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = 50;
 
-        $result = $this->paginate('results', $page, $perPage, $filters, 'total_marks.desc');
+        $result = $this->paginate('exam_results', $page, $perPage, [], 'created_at.desc');
 
         $this->renderWithLayout('reports.index', [
             'pageTitle'   => 'Academic Results Report',
@@ -204,15 +195,15 @@ class ReportController extends Controller
 
         switch ($type) {
             case 'enrollment':
-                $results = $this->db->select('students', [], 'name.asc', 10000);
+                $results = $this->db->select('users', ['userType' => ['eq' => 'student']], 'first_name.asc', 10000);
                 $headers = ['Name', 'Email', 'Class', 'Status', 'Enrolled Date'];
                 foreach ($results as $row) {
                     $data[] = [
-                        $row['name'] ?? '',
+                        $row['firstName'] ?? '',
                         $row['email'] ?? '',
-                        $row['class_id'] ?? '',
+                        $row['classId'] ?? '',
                         $row['status'] ?? '',
-                        $row['created_at'] ?? '',
+                        $row['createdAt'] ?? '',
                     ];
                 }
                 $filename = 'student_enrollment_' . date('Y-m-d') . '.csv';
@@ -248,16 +239,15 @@ class ReportController extends Controller
                 break;
 
             case 'results':
-                $results = $this->db->select('results', [], 'total_marks.desc', 10000);
-                $headers = ['Student', 'Subject', 'Exam', 'Marks', 'Grade', 'Total'];
+                $results = $this->db->select('exam_results', [], 'created_at.desc', 10000);
+                $headers = ['Student', 'Exam', 'Marks', 'Grade', 'Remarks'];
                 foreach ($results as $row) {
                     $data[] = [
-                        $row['student_id'] ?? '',
-                        $row['subject_id'] ?? '',
-                        $row['exam_id'] ?? '',
-                        $row['marks_obtained'] ?? 0,
+                        $row['studentId'] ?? '',
+                        $row['examId'] ?? '',
+                        $row['marksObtained'] ?? 0,
                         $row['grade'] ?? '',
-                        $row['total_marks'] ?? 0,
+                        $row['remarks'] ?? '',
                     ];
                 }
                 $filename = 'exam_results_' . date('Y-m-d') . '.csv';
@@ -304,7 +294,7 @@ class ReportController extends Controller
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = (int) ($this->input('per_page', 50) ?: 50);
 
-        $result = $this->paginate('students', $page, $perPage, $filters, 'name.asc');
+        $result = $this->paginate('users', $page, $perPage, ['userType' => ['eq' => 'student']], 'first_name.asc');
         $this->success($result);
     }
 
@@ -329,7 +319,7 @@ class ReportController extends Controller
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = (int) ($this->input('per_page', 50) ?: 50);
 
-        $result = $this->paginate('results', $page, $perPage, $filters, 'total_marks.desc');
+        $result = $this->paginate('exam_results', $page, $perPage, [], 'created_at.desc');
         $this->success($result);
     }
 
@@ -395,10 +385,10 @@ class ReportController extends Controller
 
         switch ($type) {
             case 'enrollment':
-                $results = $this->db->select('students', [], 'name.asc', 10000);
+                $results = $this->db->select('users', ['userType' => ['eq' => 'student']], 'first_name.asc', 10000);
                 $headers = ['Name', 'Email', 'Class', 'Status', 'Enrolled Date'];
                 foreach ($results as $row) {
-                    $data[] = [$row['name'] ?? '', $row['email'] ?? '', $row['class_id'] ?? '', $row['status'] ?? '', $row['created_at'] ?? ''];
+                    $data[] = [$row['firstName'] ?? '', $row['email'] ?? '', $row['classId'] ?? '', $row['status'] ?? '', $row['createdAt'] ?? ''];
                 }
                 break;
             case 'fees':
@@ -416,10 +406,10 @@ class ReportController extends Controller
                 }
                 break;
             case 'results':
-                $results = $this->db->select('results', [], 'total_marks.desc', 10000);
-                $headers = ['Student', 'Subject', 'Exam', 'Marks', 'Grade', 'Total'];
+                $results = $this->db->select('exam_results', [], 'created_at.desc', 10000);
+                $headers = ['Student', 'Exam', 'Marks', 'Grade', 'Remarks'];
                 foreach ($results as $row) {
-                    $data[] = [$row['student_id'] ?? '', $row['subject_id'] ?? '', $row['exam_id'] ?? '', $row['marks_obtained'] ?? 0, $row['grade'] ?? '', $row['total_marks'] ?? 0];
+                    $data[] = [$row['studentId'] ?? '', $row['examId'] ?? '', $row['marksObtained'] ?? 0, $row['grade'] ?? '', $row['remarks'] ?? ''];
                 }
                 break;
         }

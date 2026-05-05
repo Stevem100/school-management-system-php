@@ -73,11 +73,13 @@ class ModuleController extends Controller
                  INNER JOIN permissions p ON rp.permission_id = p.id"
             );
             foreach ($rp as $row) {
-                $rid = $row['role_id'];
-                if (!isset($rolePermissions[$rid])) {
+                $rid = $row['roleId'] ?? $row['role_id'] ?? null;
+                if ($rid !== null && !isset($rolePermissions[$rid])) {
                     $rolePermissions[$rid] = [];
                 }
-                $rolePermissions[$rid][] = $row['perm_name'];
+                if ($rid !== null) {
+                    $rolePermissions[$rid][] = $row['permName'] ?? $row['perm_name'] ?? '';
+                }
             }
         } catch (\RuntimeException $e) {
             // Fall back to empty
@@ -206,11 +208,13 @@ class ModuleController extends Controller
                  INNER JOIN permissions p ON rp.permission_id = p.id"
             );
             foreach ($rp as $row) {
-                $rid = $row['role_id'];
-                if (!isset($rolePermissions[$rid])) {
+                $rid = $row['roleId'] ?? $row['role_id'] ?? null;
+                if ($rid !== null && !isset($rolePermissions[$rid])) {
                     $rolePermissions[$rid] = [];
                 }
-                $rolePermissions[$rid][] = $row['perm_name'];
+                if ($rid !== null) {
+                    $rolePermissions[$rid][] = $row['permName'] ?? $row['perm_name'] ?? '';
+                }
             }
             foreach ($roles as $r) {
                 $roleMap[$r['id']] = $r['name'];
