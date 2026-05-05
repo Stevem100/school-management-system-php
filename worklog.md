@@ -46,3 +46,22 @@ Stage Summary:
 - Fixed fatal "class already in use" error in `app/Controllers/Controller.php`
 - Fixed 7 controllers that were incorrectly extending `Core\Controller` instead of `App\Controllers\Controller`
 - Added missing `BASE_PATH` constant definition in `index.php`
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix login redirect with no validation message — flash messages + error handling
+
+Work Log:
+- Diagnosed login redirect issue: user submits login form, gets redirected back to /login with NO error message
+- Root cause 1 (critical): Flash message system in Session.php was broken — `flash()` immediately marked keys as "old", causing `ageFlashData()` to DELETE them on the very next request BEFORE the login page could read them
+- Fix 1: Removed the `_flash_old` tracking from `Session::flash()`. Updated `Session::ageFlashData()` to: (1) delete previously-old flashes, (2) scan current session for flash_ keys and mark them as old for removal on the NEXT request
+- Root cause 2: `AuthController::login()` (GET handler) called `$this->auth()->check()` which instantiates a Database connection just to show the login page — wasteful and can fail
+- Fix 2: Changed to check `Session::get('user')` and `Session::get('token')` directly without creating a DB connection
+- Added try/catch with `error_log()` in `doLogin()` around the auth operation to surface DB errors instead of silently failing
+- Pushed all fixes to GitHub (2 commits: 15a6079, 9f441f1)
+
+Stage Summary:
+- Fixed flash message system — error/success messages now properly display on login page after redirect
+- Login page no longer requires database connection to render
+- DB errors during login are now logged and shown to the user
