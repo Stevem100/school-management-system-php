@@ -85,7 +85,7 @@
                 </div>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2"><?= e($item['message'] ?? '') ?></p>
                 <div class="mt-1 flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
-                  <span><?= e($item['sender_id'] ?? 'System') ?></span>
+                  <span><?= e($item['sender_id'] ? ('User #' . $item['sender_id']) : 'System') ?></span>
                   <span>&middot;</span>
                   <span><?= timeAgo($item['created_at'] ?? null) ?></span>
                 </div>

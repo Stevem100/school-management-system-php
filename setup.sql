@@ -566,13 +566,18 @@ CREATE TABLE IF NOT EXISTS notifications (
   school_id INT UNSIGNED,
   branch_id INT UNSIGNED,
   user_id INT UNSIGNED,
+  sender_id INT UNSIGNED,
+  recipient_id INT UNSIGNED,
   title VARCHAR(255) NOT NULL,
   message TEXT NOT NULL,
   type VARCHAR(255) DEFAULT 'info',
   channel VARCHAR(255) DEFAULT 'in_app',
+  priority VARCHAR(255) DEFAULT 'medium',
   is_read TINYINT(1) DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_notifications_user (user_id)
+  INDEX idx_notifications_user (user_id),
+  INDEX idx_notifications_recipient (recipient_id),
+  INDEX idx_notifications_sender (sender_id)
 );
 
 -- ==================== AI MODULE ====================
@@ -641,9 +646,14 @@ CREATE TABLE IF NOT EXISTS ai_logs (
 CREATE TABLE IF NOT EXISTS modules (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE,
-  version VARCHAR(255) DEFAULT '1.0.0',
+  display_name VARCHAR(255),
   description TEXT,
+  icon VARCHAR(255),
+  route VARCHAR(255),
+  version VARCHAR(255) DEFAULT '1.0.0',
+  sort_order INT DEFAULT 0,
   is_core TINYINT(1) DEFAULT 0,
+  is_active TINYINT(1) DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -1078,17 +1088,22 @@ INSERT INTO skills (school_id, branch_id, name, code, strand, sub_strand, level,
   (1, 3, 'Learning to Learn', 'LTL', 'Core Competencies', 'Study Skills', 'basic', 'CBC aligned Learning to Learn competency');
 
 -- ==================== STEP 17: MODULES ====================
-INSERT INTO modules (name, version, description, is_core) VALUES
-  ('academic', '1.0.0', 'Academic management', 1),
-  ('finance', '1.0.0', 'Fee management and payments', 1),
-  ('attendance', '1.0.0', 'Student attendance tracking', 1),
-  ('ai', '1.0.0', 'AI-powered learning assistant', 0),
-  ('transport', '1.0.0', 'School transport management', 0),
-  ('library', '1.0.0', 'Library and book management', 0),
-  ('hostel', '1.0.0', 'Hostel and room management', 0),
-  ('lms', '1.0.0', 'Learning management system', 0),
-  ('communication', '1.0.0', 'Notifications and messaging', 1),
-  ('reports', '1.0.0', 'School-wide reports and analytics', 1);
+INSERT INTO modules (name, display_name, description, icon, route, version, sort_order, is_core, is_active) VALUES
+  ('academic', 'Academic', 'Academic management', '📚', '/classes', '1.0.0', 1, 1, 1),
+  ('finance', 'Finance', 'Fee management and payments', '💰', '/fees', '1.0.0', 2, 1, 1),
+  ('attendance', 'Attendance', 'Student attendance tracking', '📋', '/attendance', '1.0.0', 3, 1, 1),
+  ('ai', 'AI Assistant', 'AI-powered learning assistant', '🤖', '/ai-chat', '1.0.0', 4, 0, 1),
+  ('transport', 'Transport', 'School transport management', '🚌', '/transport', '1.0.0', 5, 0, 1),
+  ('library', 'Library', 'Library and book management', '📖', '/library', '1.0.0', 6, 0, 1),
+  ('hostel', 'Hostel', 'Hostel and room management', '🏠', '/hostel', '1.0.0', 7, 0, 1),
+  ('lms', 'LMS', 'Learning management system', '💻', '/lms', '1.0.0', 8, 0, 1),
+  ('communication', 'Communication', 'Notifications and messaging', '✉️', '/communication', '1.0.0', 9, 1, 1),
+  ('reports', 'Reports', 'School-wide reports and analytics', '📊', '/reports', '1.0.0', 10, 1, 1),
+  ('students', 'Students', 'Student management and profiles', '🎓', '/students', '1.0.0', 11, 1, 1),
+  ('schools', 'Schools', 'Multi-school management', '🏫', '/schools', '1.0.0', 12, 1, 1),
+  ('branches', 'Branches', 'Branch and campus management', '🏢', '/branches', '1.0.0', 13, 1, 1),
+  ('users', 'Users', 'User account management', '👥', '/users', '1.0.0', 14, 1, 1),
+  ('roles', 'Roles', 'Role and permission management', '🛡️', '/roles', '1.0.0', 15, 1, 1);
 
 INSERT INTO module_licenses (module_id, school_id, branch_id, is_enabled) VALUES
   (1, 1, 2, 1),

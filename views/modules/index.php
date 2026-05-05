@@ -4,6 +4,11 @@
     $editModule = $editModule ?? null;
     $search = $search ?? '';
     $pagination = $pagination ?? ['totalPages' => 0, 'total' => 0, 'page' => 1, 'from' => 0, 'to' => 0];
+    $roles = $roles ?? [];
+    $permissionsByModule = $permissionsByModule ?? [];
+    $rolePermissions = $rolePermissions ?? [];
+    $roleMap = $roleMap ?? [];
+    $userRoles = $userRoles ?? [];
 ?>
 <div class="space-y-6">
   <!-- Page Header -->
@@ -35,7 +40,7 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     <?php foreach($modules as $item): ?>
     <?php
-      $isActive = $item['is_active'] ?? true;
+      $isActive = isset($item['is_active']) ? (bool) $item['is_active'] : true;
       $displayName = $item['display_name'] ?? $item['name'] ?? 'Untitled';
       $icon = $item['icon'] ?? '';
       $description = $item['description'] ?? '';
@@ -133,9 +138,39 @@
         <span class="text-[10px] text-gray-400 dark:text-gray-500">Sort: <?= $sortOrder ?></span>
       </div>
 
-      <?php if (!empty($route)): ?>
       <div class="mt-2">
         <code class="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 px-1.5 py-0.5 rounded">/<?= e($route) ?></code>
+      </div>
+      <?php endif; ?>
+
+      <!-- Roles with access -->
+      <?php if (!empty($roles) && !empty($rolePermissions)): ?>
+      <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+        <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-1.5 font-medium uppercase tracking-wider">Roles with access</p>
+        <div class="flex flex-wrap gap-1">
+          <?php foreach ($roles as $role):
+            $rid = $role['id'];
+            $rname = $role['name'];
+            $rPerms = $rolePermissions[$rid] ?? [];
+            $hasAccess = false;
+            $modPerms = $permissionsByModule[$item['name']] ?? [];
+            foreach ($modPerms as $mp) {
+              if (in_array($mp['name'], $rPerms)) { $hasAccess = true; break; }
+            }
+            if ($hasAccess):
+              $roleColorMap = [
+                'SuperAdmin' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                'SchoolAdmin' => 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                'BranchAdmin' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                'Dean' => 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+                'Teacher' => 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+                'Student' => 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+              ];
+              $rc = $roleColorMap[$rname] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
+          ?>
+          <span class="inline-flex items-center rounded-full <?= $rc ?> px-2 py-0.5 text-[10px] font-medium"><?= e($rname) ?></span>
+          <?php endif; endforeach; ?>
+        </div>
       </div>
       <?php endif; ?>
     </div>
