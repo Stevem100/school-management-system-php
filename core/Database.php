@@ -499,6 +499,11 @@ class Database
         foreach ($filters as $column => $conditions) {
             $snakeColumn = $this->toSnakeCase((string) $column);
 
+            // Support shorthand: if conditions is not an array, treat as ['eq' => $conditions]
+            if (!is_array($conditions)) {
+                $conditions = ['eq' => $conditions];
+            }
+
             foreach ($conditions as $operator => $value) {
                 $clause = $this->buildFilterExpression($snakeColumn, $operator, $value, $values);
                 if ($clause !== null) {
