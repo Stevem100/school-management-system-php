@@ -25,16 +25,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Supabase Configuration
+    | MySQL Database Configuration
     |--------------------------------------------------------------------------
     |
-    | Credentials for connecting to the Supabase PostgREST API.
-    | The secret key is used as the service_role key, which bypasses RLS.
+    | Credentials for connecting to the MySQL database via PDO.
+    | All values can be overridden via environment variables.
     |
     */
-    'supabase_url' => getenv('SUPABASE_URL') ?: '',
-    'supabase_publishable_key' => getenv('SUPABASE_PUBLISHABLE_KEY') ?: '',
-    'supabase_secret_key' => getenv('SUPABASE_SECRET_KEY') ?: '',
+    'db_host' => getenv('DB_HOST') ?: 'localhost',
+    'db_port' => getenv('DB_PORT') ?: '3306',
+    'db_name' => getenv('DB_NAME') ?: 'school_erp',
+    'db_user' => getenv('DB_USER') ?: 'root',
+    'db_password' => getenv('DB_PASSWORD') ?: '',
 
     /*
     |--------------------------------------------------------------------------

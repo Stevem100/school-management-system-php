@@ -48,15 +48,8 @@ class Auth
     public function login(string $email, string $password): array
     {
         try {
-            // Find user by email with roles
-            $user = $this->db->query(
-                'users',
-                'GET',
-                null,
-                ['email' => ['eq' => $email]],
-                null,
-                1
-            );
+            // Find user by email
+            $user = $this->db->select('users', ['email' => ['eq' => $email]], null, 1);
 
             if (empty($user)) {
                 return [
@@ -88,26 +81,20 @@ class Auth
                 ];
             }
 
-            // Fetch user roles from user_roles joined with roles
-            $roles = $this->db->query(
-                'user_roles',
-                'GET',
-                null,
-                ['user_id' => ['eq' => $user['id']]],
-                null,
-                null,
-                null,
-                'role_id,roles(id,name,description,permissions)'
-            );
+            // Fetch user roles via raw JOIN query (Supabase embedded select syntax
+            // does not work with PDO, so we use a raw SQL JOIN instead)
+            $sql = "SELECT r.name, r.id, r.description, r.permissions
+                    FROM user_roles ur
+                    INNER JOIN roles r ON ur.role_id = r.id
+                    WHERE ur.user_id = ?";
+            $roles = $this->db->raw($sql, [$user['id']]);
 
             $roleNames = [];
             $roleData = [];
             if (!empty($roles)) {
-                foreach ($roles as $userRole) {
-                    if (isset($userRole['roles']) && is_array($userRole['roles'])) {
-                        $roleNames[] = $userRole['roles']['name'];
-                        $roleData[] = $userRole['roles'];
-                    }
+                foreach ($roles as $role) {
+                    $roleNames[] = $role['name'];
+                    $roleData[] = $role;
                 }
             }
 
@@ -123,7 +110,7 @@ class Auth
                 'ip_address' => Request::ip(),
                 'user_agent' => Request::userAgent(),
                 'expires_at' => $expiresAt,
-                'is_active'  => true,
+                'is_active'  => 1,
             ]);
 
             // Store user data in PHP session
@@ -166,7 +153,7 @@ class Auth
         if ($token !== null) {
             try {
                 // Deactivate the session token in the database
-                $this->db->update('sessions', ['is_active' => false], [
+                $this->db->update('sessions', ['is_active' => 0], [
                     'token' => ['eq' => $token],
                 ]);
             } catch (\RuntimeException $e) {
@@ -236,7 +223,7 @@ class Auth
         try {
             $session = $this->db->single('sessions', [
                 'token'     => ['eq' => $token],
-                'is_active' => ['eq' => 'true'],
+                'is_active' => 1,
             ]);
 
             if ($session === null) {
@@ -247,7 +234,7 @@ class Auth
 
             // Check if session has expired
             if (isset($session['expiresAt']) && strtotime((string) $session['expiresAt']) < time()) {
-                $this->db->update('sessions', ['is_active' => false], [
+                $this->db->update('sessions', ['is_active' => 0], [
                     'token' => ['eq' => $token],
                 ]);
                 $this->logout();
@@ -364,7 +351,7 @@ class Auth
             // Find active session by token
             $session = $this->db->single('sessions', [
                 'token'     => ['eq' => $token],
-                'is_active' => ['eq' => 'true'],
+                'is_active' => 1,
             ]);
 
             if ($session === null) {
@@ -377,7 +364,7 @@ class Auth
 
             // Check expiry
             if (isset($session['expiresAt']) && strtotime((string) $session['expiresAt']) < time()) {
-                $this->db->update('sessions', ['is_active' => false], [
+                $this->db->update('sessions', ['is_active' => 0], [
                     'token' => ['eq' => $token],
                 ]);
                 return [
@@ -399,26 +386,19 @@ class Auth
                 ];
             }
 
-            // Fetch roles
-            $roles = $this->db->query(
-                'user_roles',
-                'GET',
-                null,
-                ['user_id' => ['eq' => $userId]],
-                null,
-                null,
-                null,
-                'role_id,roles(id,name,description,permissions)'
-            );
+            // Fetch roles via raw JOIN query
+            $sql = "SELECT r.name, r.id, r.description, r.permissions
+                    FROM user_roles ur
+                    INNER JOIN roles r ON ur.role_id = r.id
+                    WHERE ur.user_id = ?";
+            $roles = $this->db->raw($sql, [$userId]);
 
             $roleNames = [];
             $roleData = [];
             if (!empty($roles)) {
-                foreach ($roles as $userRole) {
-                    if (isset($userRole['roles']) && is_array($userRole['roles'])) {
-                        $roleNames[] = $userRole['roles']['name'];
-                        $roleData[] = $userRole['roles'];
-                    }
+                foreach ($roles as $role) {
+                    $roleNames[] = $role['name'];
+                    $roleData[] = $role;
                 }
             }
 

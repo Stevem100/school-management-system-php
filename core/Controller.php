@@ -19,14 +19,17 @@ abstract class Controller
     /**
      * Create a new controller instance.
      *
-     * Automatically initializes the Database connection from app config.
+     * Automatically initializes the MySQL PDO Database connection from app config.
      */
     public function __construct()
     {
-        $supabaseUrl = (string) config('supabase_url');
-        $supabaseKey = (string) config('supabase_secret_key');
-
-        $this->db = new Database($supabaseUrl, $supabaseKey);
+        $this->db = new Database(
+            (string) config('db_host', 'localhost'),
+            (string) config('db_port', '3306'),
+            (string) config('db_name', 'school_erp'),
+            (string) config('db_user', 'root'),
+            (string) config('db_password', ''),
+        );
     }
 
     /**
@@ -39,6 +42,40 @@ abstract class Controller
     protected function view(string $path, array $data = []): void
     {
         Response::view($path, $data);
+    }
+
+    /**
+     * Render a view inside the application layout.
+     *
+     * Captures the view output and passes it as $content to views/layouts/app.php
+     * along with the provided $data array.
+     *
+     * @param string $viewPath View path (dot notation: 'dashboard.index' → views/dashboard/index.php)
+     * @param array  $data     Data to pass to both the view and layout
+     * @return void
+     */
+    protected function renderWithLayout(string $viewPath, array $data = []): void
+    {
+        // Convert dot notation to file path
+        $dotPath = str_replace('.', '/', $viewPath);
+        $viewFile = BASE_PATH . '/views/' . $dotPath . '.php';
+        $layoutFile = BASE_PATH . '/views/layouts/app.php';
+
+        // Capture the view content
+        ob_start();
+        if (file_exists($viewFile)) {
+            extract($data, EXTR_SKIP);
+            include $viewFile;
+        }
+        $content = ob_get_clean();
+
+        // Pass content to layout
+        $layoutData = array_merge($data, ['content' => $content]);
+
+        if (file_exists($layoutFile)) {
+            extract($layoutData, EXTR_SKIP);
+            include $layoutFile;
+        }
     }
 
     /**

@@ -1,64 +1,58 @@
--- School Management System - Full Seed Script
--- Run this in Supabase SQL Editor (https://supabase.com/dashboard/project/uomjhejhtlzmayxvzglg/sql)
--- This script: disables RLS, creates demo data, re-enables RLS with permissive policies
+-- School Management System - Full Seed Script (MySQL)
+-- Run this file in MySQL client: mysql -u root school_erp < seed-data.sql
+-- Or via phpMyAdmin SQL tab
+-- This script: clears data, creates demo data
+-- Can be run after setup.sql to re-seed the database
 
--- ==================== STEP 1: DISABLE RLS ON ALL TABLES ====================
-ALTER TABLE schools DISABLE ROW LEVEL SECURITY;
-ALTER TABLE branches DISABLE ROW LEVEL SECURITY;
-ALTER TABLE roles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE permissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE role_permissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE user_roles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE sessions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE student_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE teacher_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE parent_profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE student_parents DISABLE ROW LEVEL SECURITY;
-ALTER TABLE classes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE classrooms DISABLE ROW LEVEL SECURITY;
-ALTER TABLE enrollments DISABLE ROW LEVEL SECURITY;
-ALTER TABLE subjects DISABLE ROW LEVEL SECURITY;
-ALTER TABLE subject_teachers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE exams DISABLE ROW LEVEL SECURITY;
-ALTER TABLE exam_results DISABLE ROW LEVEL SECURITY;
-ALTER TABLE timetable_entries DISABLE ROW LEVEL SECURITY;
-ALTER TABLE skills DISABLE ROW LEVEL SECURITY;
-ALTER TABLE student_skills DISABLE ROW LEVEL SECURITY;
-ALTER TABLE teacher_skills DISABLE ROW LEVEL SECURITY;
-ALTER TABLE fees DISABLE ROW LEVEL SECURITY;
-ALTER TABLE payments DISABLE ROW LEVEL SECURITY;
-ALTER TABLE transport_routes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE transport_vehicles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE transport_assignments DISABLE ROW LEVEL SECURITY;
-ALTER TABLE hostel_rooms DISABLE ROW LEVEL SECURITY;
-ALTER TABLE hostel_assignments DISABLE ROW LEVEL SECURITY;
-ALTER TABLE books DISABLE ROW LEVEL SECURITY;
-ALTER TABLE book_borrowals DISABLE ROW LEVEL SECURITY;
-ALTER TABLE lms_courses DISABLE ROW LEVEL SECURITY;
-ALTER TABLE lms_lessons DISABLE ROW LEVEL SECURITY;
-ALTER TABLE lms_assignments DISABLE ROW LEVEL SECURITY;
-ALTER TABLE lms_submissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_conversations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_messages DISABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_logs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE modules DISABLE ROW LEVEL SECURITY;
-ALTER TABLE module_licenses DISABLE ROW LEVEL SECURITY;
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
--- ==================== STEP 2: CLEAR EXISTING DATA ====================
-TRUNCATE TABLE module_licenses, modules, ai_logs, ai_messages, ai_conversations, ai_settings,
-  notifications, lms_submissions, lms_assignments, lms_lessons, lms_courses,
-  book_borrowals, books, hostel_assignments, hostel_rooms,
-  transport_assignments, transport_vehicles, transport_routes,
-  payments, fees, student_skills, teacher_skills, skills,
-  timetable_entries, exam_results, exams, subject_teachers, subjects,
-  enrollments, classes, classrooms, student_parents, parent_profiles,
-  student_profiles, teacher_profiles, user_roles, sessions, users,
-  role_permissions, permissions, roles, branches, schools CASCADE;
+-- ==================== STEP 1: CLEAR EXISTING DATA ====================
+TRUNCATE TABLE module_licenses;
+TRUNCATE TABLE modules;
+TRUNCATE TABLE ai_logs;
+TRUNCATE TABLE ai_messages;
+TRUNCATE TABLE ai_conversations;
+TRUNCATE TABLE ai_settings;
+TRUNCATE TABLE notifications;
+TRUNCATE TABLE lms_submissions;
+TRUNCATE TABLE lms_assignments;
+TRUNCATE TABLE lms_lessons;
+TRUNCATE TABLE lms_courses;
+TRUNCATE TABLE book_borrowals;
+TRUNCATE TABLE books;
+TRUNCATE TABLE hostel_assignments;
+TRUNCATE TABLE hostel_rooms;
+TRUNCATE TABLE transport_assignments;
+TRUNCATE TABLE transport_vehicles;
+TRUNCATE TABLE transport_routes;
+TRUNCATE TABLE payments;
+TRUNCATE TABLE fees;
+TRUNCATE TABLE student_skills;
+TRUNCATE TABLE teacher_skills;
+TRUNCATE TABLE skills;
+TRUNCATE TABLE timetable_entries;
+TRUNCATE TABLE exam_results;
+TRUNCATE TABLE exams;
+TRUNCATE TABLE subject_teachers;
+TRUNCATE TABLE subjects;
+TRUNCATE TABLE enrollments;
+TRUNCATE TABLE classes;
+TRUNCATE TABLE classrooms;
+TRUNCATE TABLE student_parents;
+TRUNCATE TABLE parent_profiles;
+TRUNCATE TABLE student_profiles;
+TRUNCATE TABLE teacher_profiles;
+TRUNCATE TABLE user_roles;
+TRUNCATE TABLE sessions;
+TRUNCATE TABLE users;
+TRUNCATE TABLE role_permissions;
+TRUNCATE TABLE permissions;
+TRUNCATE TABLE roles;
+TRUNCATE TABLE branches;
+TRUNCATE TABLE schools;
 
--- ==================== STEP 3: CREATE ROLES ====================
+-- ==================== STEP 2: CREATE ROLES ====================
 INSERT INTO roles (name, scope, description, level) VALUES
   ('SuperAdmin', 'global', 'System administrator with full access', 100),
   ('SchoolAdmin', 'school', 'School-wide administrator', 80),
@@ -72,7 +66,7 @@ INSERT INTO roles (name, scope, description, level) VALUES
   ('Parent', 'branch', 'Student parent/guardian', 10),
   ('Student', 'branch', 'School student', 5);
 
--- ==================== STEP 4: CREATE PERMISSIONS ====================
+-- ==================== STEP 3: CREATE PERMISSIONS ====================
 INSERT INTO permissions (name, module, action, description) VALUES
   ('schools.view', 'schools', 'view', 'view schools'),
   ('schools.create', 'schools', 'create', 'create schools'),
@@ -143,7 +137,7 @@ INSERT INTO permissions (name, module, action, description) VALUES
   ('lms.delete', 'lms', 'delete', 'delete lms'),
   ('lms.manage', 'lms', 'manage', 'manage lms');
 
--- ==================== STEP 5: ROLE-PERMISSION MAPPINGS ====================
+-- ==================== STEP 4: ROLE-PERMISSION MAPPINGS ====================
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE (r.name = 'SuperAdmin')
@@ -204,229 +198,235 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'Student' AND p.name IN ('academic.view','lms.view','ai.view','ai.chat','library.view');
 
--- ==================== STEP 6: CREATE SCHOOL ====================
+-- ==================== STEP 5: CREATE SCHOOL ====================
 INSERT INTO schools (name, code, type, address, phone, email, website) VALUES
   ('Greenfield Academy', 'GA', 'general', '123 Education Lane, Nairobi', '+254-700-123456', 'info@greenfield.ac.ke', 'https://greenfield.ac.ke');
 
--- ==================== STEP 7: CREATE BRANCHES ====================
+-- ==================== STEP 6: CREATE BRANCHES ====================
 INSERT INTO branches (school_id, name, code, address, phone) VALUES
-  ((SELECT id FROM schools WHERE code = 'GA'), 'Main Campus', 'MC', '123 Education Lane, Nairobi', '+254-700-123456'),
-  ((SELECT id FROM schools WHERE code = 'GA'), 'West Campus', 'WC', '456 West Avenue, Nakuru', '+254-700-789012');
+  (1, 'Main Campus', 'MC', '123 Education Lane, Nairobi', '+254-700-123456'),
+  (1, 'West Campus', 'WC', '456 West Avenue, Nakuru', '+254-700-789012');
 
--- ==================== STEP 8: CREATE USERS ====================
+-- ==================== STEP 7: CREATE USERS ====================
 -- Passwords are SHA-256 hashes of: password + '_school_erp_salt'
 -- admin123: 03b1dbf3638037f717845e3e36e2c5ae0c28a13abef309dd61976f4c40fa2b18
 -- demo123: 809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083
 -- student123: 10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72
 
 INSERT INTO users (email, password, first_name, last_name, phone, school_id, branch_id) VALUES
-  -- SuperAdmin
-  ('admin@school.com', '03b1dbf3638037f717845e3e36e2c5ae0c28a13abef309dd61976f4c40fa2b18', 'Admin', 'User', '+254-700-000001',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  -- SchoolAdmin
-  ('schooladmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Margaret', 'Wanjiku', '+254-700-000010',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  -- BranchAdmins
-  ('branchadmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'James', 'Odhiambo', '+254-700-000011',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('westadmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Grace', 'Chebet', '+254-700-000012',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  -- Dean
-  ('dean@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Prof', 'Kamau', '+254-700-000013',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  -- Teachers
-  ('mary@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Mary', 'Akinyi', '+254-700-000020',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('john@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'John', 'Mwangi', '+254-700-000021',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('faith@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Faith', 'Rotich', '+254-700-000022',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  -- Staff
-  ('accounts@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Peter', 'Kariuki', '+254-700-000030',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('library@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Susan', 'Njeri', '+254-700-000031',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('transport@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'David', 'Mutua', '+254-700-000032',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('hostel@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Rose', 'Wambui', '+254-700-000033',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  -- Students
-  ('brian.njorgemc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Brian', 'Njoroge', '+254-700-000101',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('sarah.muthonimc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Sarah', 'Muthoni', '+254-700-000102',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('kevin.otienomc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Kevin', 'Otieno', '+254-700-000103',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('lucy.wanjirumc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Lucy', 'Wanjiru', '+254-700-000104',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('daniel.kipchogemc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Daniel', 'Kipchoge', '+254-700-000105',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'MC')),
-  ('amina.hassanwc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Amina', 'Hassan', '+254-700-000106',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  ('ian.machariawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Ian', 'Macharia', '+254-700-000107',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  ('esther.nekesawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Esther', 'Nekesa', '+254-700-000108',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  ('alex.wekesawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Alex', 'Wekesa', '+254-700-000109',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC')),
-  ('mercy.moraawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Mercy', 'Moraa', '+254-700-000110',
-    (SELECT id FROM schools WHERE code = 'GA'), (SELECT id FROM branches WHERE code = 'WC'));
+  -- id=1: SuperAdmin
+  ('admin@school.com', '03b1dbf3638037f717845e3e36e2c5ae0c28a13abef309dd61976f4c40fa2b18', 'Admin', 'User', '+254-700-000001', 1, 2),
+  -- id=2: SchoolAdmin
+  ('schooladmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Margaret', 'Wanjiku', '+254-700-000010', 1, 2),
+  -- id=3: BranchAdmin (Main)
+  ('branchadmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'James', 'Odhiambo', '+254-700-000011', 1, 2),
+  -- id=4: BranchAdmin (West)
+  ('westadmin@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Grace', 'Chebet', '+254-700-000012', 1, 3),
+  -- id=5: Dean
+  ('dean@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Prof', 'Kamau', '+254-700-000013', 1, 2),
+  -- id=6: Teacher (Main)
+  ('mary@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Mary', 'Akinyi', '+254-700-000020', 1, 2),
+  -- id=7: Teacher (Main)
+  ('john@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'John', 'Mwangi', '+254-700-000021', 1, 2),
+  -- id=8: Teacher (West)
+  ('faith@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Faith', 'Rotich', '+254-700-000022', 1, 3),
+  -- id=9: Accountant
+  ('accounts@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Peter', 'Kariuki', '+254-700-000030', 1, 2),
+  -- id=10: Librarian
+  ('library@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Susan', 'Njeri', '+254-700-000031', 1, 2),
+  -- id=11: Transport Manager
+  ('transport@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'David', 'Mutua', '+254-700-000032', 1, 2),
+  -- id=12: Hostel Manager
+  ('hostel@greenfield.ac.ke', '809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083', 'Rose', 'Wambui', '+254-700-000033', 1, 2),
+  -- id=13-22: Students
+  ('brian.njorgemc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Brian', 'Njoroge', '+254-700-000101', 1, 2),
+  ('sarah.muthonimc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Sarah', 'Muthoni', '+254-700-000102', 1, 2),
+  ('kevin.otienomc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Kevin', 'Otieno', '+254-700-000103', 1, 2),
+  ('lucy.wanjirumc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Lucy', 'Wanjiru', '+254-700-000104', 1, 2),
+  ('daniel.kipchogemc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Daniel', 'Kipchoge', '+254-700-000105', 1, 2),
+  ('amina.hassanwc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Amina', 'Hassan', '+254-700-000106', 1, 3),
+  ('ian.machariawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Ian', 'Macharia', '+254-700-000107', 1, 3),
+  ('esther.nekesawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Esther', 'Nekesa', '+254-700-000108', 1, 3),
+  ('alex.wekesawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Alex', 'Wekesa', '+254-700-000109', 1, 3),
+  ('mercy.moraawc@greenfield.ac.ke', '10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72', 'Mercy', 'Moraa', '+254-700-000110', 1, 3);
 
--- ==================== STEP 9: ASSIGN USER ROLES ====================
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'admin@school.com' AND r.name = 'SuperAdmin';
+-- ==================== STEP 8: ASSIGN USER ROLES ====================
+INSERT INTO user_roles (user_id, role_id, school_id, branch_id) VALUES
+  (1, 1, 1, 2),   -- admin → SuperAdmin
+  (2, 2, 1, 2),   -- schooladmin → SchoolAdmin
+  (3, 3, 1, 2),   -- branchadmin → BranchAdmin (Main)
+  (4, 3, 1, 3),   -- westadmin → BranchAdmin (West)
+  (5, 4, 1, 2),   -- dean → Dean
+  (6, 5, 1, 2),   -- mary → Teacher (Main)
+  (7, 5, 1, 2),   -- john → Teacher (Main)
+  (8, 5, 1, 3),   -- faith → Teacher (West)
+  (9, 6, 1, 2),   -- accounts → Accountant
+  (10, 7, 1, 2),  -- library → Librarian
+  (11, 8, 1, 2),  -- transport → TransportManager
+  (12, 9, 1, 2),  -- hostel → HostelManager
+  (13, 11, 1, 2), -- brian → Student (Main)
+  (14, 11, 1, 2), -- sarah → Student (Main)
+  (15, 11, 1, 2), -- kevin → Student (Main)
+  (16, 11, 1, 2), -- lucy → Student (Main)
+  (17, 11, 1, 2), -- daniel → Student (Main)
+  (18, 11, 1, 3), -- amina → Student (West)
+  (19, 11, 1, 3), -- ian → Student (West)
+  (20, 11, 1, 3), -- esther → Student (West)
+  (21, 11, 1, 3), -- alex → Student (West)
+  (22, 11, 1, 3); -- mercy → Student (West)
 
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'schooladmin@greenfield.ac.ke' AND r.name = 'SchoolAdmin';
+-- ==================== STEP 9: TEACHER PROFILES ====================
+INSERT INTO teacher_profiles (user_id, school_id, branch_id, employee_id, qualification, specialization, department) VALUES
+  (6, 1, 2, CONCAT('EMP', UNIX_TIMESTAMP(), '0006'), 'Bachelor of Education', 'Mathematics & Science', 'Academic'),
+  (7, 1, 2, CONCAT('EMP', UNIX_TIMESTAMP(), '0007'), 'Bachelor of Education', 'Mathematics & Science', 'Academic'),
+  (8, 1, 3, CONCAT('EMP', UNIX_TIMESTAMP(), '0008'), 'Bachelor of Education', 'Mathematics & Science', 'Academic');
 
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email IN ('branchadmin@greenfield.ac.ke', 'westadmin@greenfield.ac.ke') AND r.name = 'BranchAdmin';
+-- ==================== STEP 10: STUDENT PROFILES ====================
+INSERT INTO student_profiles (user_id, school_id, branch_id, admission_no, date_of_birth, gender, guardian_name, guardian_phone) VALUES
+  -- Main Campus students (branch_id=2, code=MC)
+  (13, 1, 2, 'ADM/MC/101', '2012-01-15', 'male',   'Njoroge Parent',  '+254-7000001'),
+  (14, 1, 2, 'ADM/MC/102', '2012-04-15', 'female', 'Muthoni Parent',  '+254-7000002'),
+  (15, 1, 2, 'ADM/MC/103', '2012-07-15', 'male',   'Otieno Parent',   '+254-7000003'),
+  (16, 1, 2, 'ADM/MC/104', '2012-10-15', 'female', 'Wanjiru Parent',  '+254-7000004'),
+  (17, 1, 2, 'ADM/MC/105', '2013-01-15', 'male',   'Kipchoge Parent', '+254-7000005'),
+  -- West Campus students (branch_id=3, code=WC)
+  (18, 1, 3, 'ADM/WC/101', '2013-04-15', 'female', 'Hassan Parent',   '+254-7000006'),
+  (19, 1, 3, 'ADM/WC/102', '2013-07-15', 'male',   'Macharia Parent', '+254-7000007'),
+  (20, 1, 3, 'ADM/WC/103', '2013-10-15', 'female', 'Nekesa Parent',   '+254-7000008'),
+  (21, 1, 3, 'ADM/WC/104', '2014-01-15', 'male',   'Wekesa Parent',   '+254-7000009'),
+  (22, 1, 3, 'ADM/WC/105', '2014-04-15', 'female', 'Moraa Parent',    '+254-7000010');
 
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'dean@greenfield.ac.ke' AND r.name = 'Dean';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email IN ('mary@greenfield.ac.ke', 'john@greenfield.ac.ke', 'faith@greenfield.ac.ke') AND r.name = 'Teacher';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'accounts@greenfield.ac.ke' AND r.name = 'Accountant';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'library@greenfield.ac.ke' AND r.name = 'Librarian';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'transport@greenfield.ac.ke' AND r.name = 'TransportManager';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email = 'hostel@greenfield.ac.ke' AND r.name = 'HostelManager';
-
-INSERT INTO user_roles (user_id, role_id, school_id, branch_id)
-SELECT u.id, r.id, u.school_id, u.branch_id FROM users u, roles r
-WHERE u.email LIKE '%@greenfield.ac.ke' AND r.name = 'Student'
-AND u.email NOT IN ('admin@school.com','schooladmin@greenfield.ac.ke','branchadmin@greenfield.ac.ke','westadmin@greenfield.ac.ke',
-  'dean@greenfield.ac.ke','mary@greenfield.ac.ke','john@greenfield.ac.ke','faith@greenfield.ac.ke',
-  'accounts@greenfield.ac.ke','library@greenfield.ac.ke','transport@greenfield.ac.ke','hostel@greenfield.ac.ke');
-
--- ==================== STEP 10: TEACHER PROFILES ====================
-INSERT INTO teacher_profiles (user_id, school_id, branch_id, employee_id, qualification, specialization, department)
-SELECT u.id, u.school_id, u.branch_id, 'EMP' || EXTRACT(EPOCH FROM now())::int || RIGHT(u.id::text, 4),
-  'Bachelor of Education', 'Mathematics & Science', 'Academic'
-FROM users u WHERE u.email IN ('mary@greenfield.ac.ke', 'john@greenfield.ac.ke', 'faith@greenfield.ac.ke');
-
--- ==================== STEP 11: STUDENT PROFILES ====================
-INSERT INTO student_profiles (user_id, school_id, branch_id, admission_no, date_of_birth, gender, guardian_name, guardian_phone)
-SELECT u.id, u.school_id, u.branch_id,
-  'ADM/' || b.code || '/' || (ROW_NUMBER() OVER (PARTITION BY u.branch_id ORDER BY u.id) + 100),
-  (DATE '2012-01-15' + (ROW_NUMBER() OVER (ORDER BY u.id) * INTERVAL '3 months'))::date,
-  CASE WHEN ROW_NUMBER() OVER (ORDER BY u.id) % 2 = 1 THEN 'male' ELSE 'female' END,
-  SPLIT_PART(u.last_name, ' ', 1) || ' Parent',
-  '+254-7' || LPAD((RANDOM() * 10000000)::int::text, 7, '0')
-FROM users u JOIN branches b ON u.branch_id = b.id
-WHERE u.email LIKE '%@greenfield.ac.ke'
-AND u.email NOT IN ('admin@school.com','schooladmin@greenfield.ac.ke','branchadmin@greenfield.ac.ke','westadmin@greenfield.ac.ke',
-  'dean@greenfield.ac.ke','mary@greenfield.ac.ke','john@greenfield.ac.ke','faith@greenfield.ac.ke',
-  'accounts@greenfield.ac.ke','library@greenfield.ac.ke','transport@greenfield.ac.ke','hostel@greenfield.ac.ke');
-
--- ==================== STEP 12: CLASSES ====================
+-- ==================== STEP 11: CLASSES ====================
 INSERT INTO classes (school_id, branch_id, name, section, numeric_level) VALUES
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 1', 'A', 1),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 2', 'A', 2),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 3', 'A', 3),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 4', 'A', 4),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 5', 'A', 5),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 6', 'A', 6),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 7', 'A', 7),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Grade 8', 'A', 8),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Form 1', 'A', 9),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Form 1', 'B', 9),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Form 2', 'A', 10),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Form 3', 'A', 11),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='MC'), 'Form 4', 'A', 12),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Grade 1', 'A', 1),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Grade 2', 'A', 2),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Grade 3', 'A', 3),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Grade 4', 'A', 4),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Grade 5', 'A', 5),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Form 1', 'A', 9),
-  ((SELECT id FROM schools WHERE code='GA'), (SELECT id FROM branches WHERE code='WC'), 'Form 2', 'A', 10);
+  -- Main Campus (school_id=1, branch_id=2): 13 classes
+  (1, 2, 'Grade 1', 'A', 1),
+  (1, 2, 'Grade 2', 'A', 2),
+  (1, 2, 'Grade 3', 'A', 3),
+  (1, 2, 'Grade 4', 'A', 4),
+  (1, 2, 'Grade 5', 'A', 5),
+  (1, 2, 'Grade 6', 'A', 6),
+  (1, 2, 'Grade 7', 'A', 7),
+  (1, 2, 'Grade 8', 'A', 8),
+  (1, 2, 'Form 1', 'A', 9),
+  (1, 2, 'Form 1', 'B', 9),
+  (1, 2, 'Form 2', 'A', 10),
+  (1, 2, 'Form 3', 'A', 11),
+  (1, 2, 'Form 4', 'A', 12),
+  -- West Campus (school_id=1, branch_id=3): 7 classes
+  (1, 3, 'Grade 1', 'A', 1),
+  (1, 3, 'Grade 2', 'A', 2),
+  (1, 3, 'Grade 3', 'A', 3),
+  (1, 3, 'Grade 4', 'A', 4),
+  (1, 3, 'Grade 5', 'A', 5),
+  (1, 3, 'Form 1', 'A', 9),
+  (1, 3, 'Form 2', 'A', 10);
 
--- ==================== STEP 13: SUBJECTS ====================
-INSERT INTO subjects (school_id, branch_id, name, code, type)
-SELECT s.id, b.id, subj.name, subj.code, subj.type
-FROM schools s, branches b,
-(VALUES ('Mathematics','MATH','core'), ('English','ENG','core'), ('Kiswahili','KIS','core'),
-  ('Science','SCI','core'), ('Social Studies','SST','core'), ('CRE','CRE','core'),
-  ('IT','IT','optional')) AS subj(name, code, type)
-WHERE s.code = 'GA';
+-- ==================== STEP 12: SUBJECTS ====================
+INSERT INTO subjects (school_id, branch_id, name, code, type) VALUES
+  -- Main Campus (school_id=1, branch_id=2)
+  (1, 2, 'Mathematics', 'MATH', 'core'),
+  (1, 2, 'English', 'ENG', 'core'),
+  (1, 2, 'Kiswahili', 'KIS', 'core'),
+  (1, 2, 'Science', 'SCI', 'core'),
+  (1, 2, 'Social Studies', 'SST', 'core'),
+  (1, 2, 'CRE', 'CRE', 'core'),
+  (1, 2, 'IT', 'IT', 'optional'),
+  -- West Campus (school_id=1, branch_id=3)
+  (1, 3, 'Mathematics', 'MATH', 'core'),
+  (1, 3, 'English', 'ENG', 'core'),
+  (1, 3, 'Kiswahili', 'KIS', 'core'),
+  (1, 3, 'Science', 'SCI', 'core'),
+  (1, 3, 'Social Studies', 'SST', 'core'),
+  (1, 3, 'CRE', 'CRE', 'core'),
+  (1, 3, 'IT', 'IT', 'optional');
 
--- ==================== STEP 14: ENROLLMENTS ====================
-INSERT INTO enrollments (student_id, class_id, school_id, branch_id, academic_year)
-WITH numbered_students AS (
-  SELECT id, school_id, branch_id,
-    (ROW_NUMBER() OVER (PARTITION BY branch_id ORDER BY id) - 1) AS student_idx
-  FROM student_profiles
-),
-numbered_classes AS (
-  SELECT id, branch_id,
-    (ROW_NUMBER() OVER (PARTITION BY branch_id ORDER BY id) - 1) AS class_idx,
-    COUNT(*) OVER (PARTITION BY branch_id) AS class_count
-  FROM classes
-)
-SELECT ns.id, nc.id, ns.school_id, ns.branch_id, EXTRACT(YEAR FROM now())::text
-FROM numbered_students ns
-JOIN numbered_classes nc ON ns.branch_id = nc.branch_id
-WHERE ns.student_idx % nc.class_count = nc.class_idx
-LIMIT (SELECT COUNT(*) FROM student_profiles);
+-- ==================== STEP 13: ENROLLMENTS ====================
+INSERT INTO enrollments (student_id, class_id, school_id, branch_id, academic_year) VALUES
+  (1, 1, 1, 2, YEAR(CURDATE())),   -- Brian (student_profile id=1) → Grade 1A Main (class id=1)
+  (2, 2, 1, 2, YEAR(CURDATE())),   -- Sarah → Grade 2A Main
+  (3, 3, 1, 2, YEAR(CURDATE())),   -- Kevin → Grade 3A Main
+  (4, 4, 1, 2, YEAR(CURDATE())),   -- Lucy → Grade 4A Main
+  (5, 5, 1, 2, YEAR(CURDATE())),   -- Daniel → Grade 5A Main
+  (6, 14, 1, 3, YEAR(CURDATE())),  -- Amina → Grade 1A West
+  (7, 15, 1, 3, YEAR(CURDATE())),  -- Ian → Grade 2A West
+  (8, 16, 1, 3, YEAR(CURDATE())),  -- Esther → Grade 3A West
+  (9, 17, 1, 3, YEAR(CURDATE())),  -- Alex → Grade 4A West
+  (10, 18, 1, 3, YEAR(CURDATE())); -- Mercy → Grade 5A West
 
--- ==================== STEP 15: FEES ====================
-INSERT INTO fees (school_id, branch_id, student_id, title, description, amount, due_date, status, academic_year, term)
-SELECT sp.school_id, sp.branch_id, sp.id, 'Term 1 Tuition Fee', 'Academic year tuition for term 1',
-  15000, (DATE_TRUNC('year', now()) + INTERVAL '2 months')::timestamptz, 'pending',
-  EXTRACT(YEAR FROM now())::text, 'Term 1'
-FROM student_profiles sp;
+-- ==================== STEP 14: FEES ====================
+INSERT INTO fees (school_id, branch_id, student_id, title, description, amount, due_date, status, academic_year, term) VALUES
+  (1, 2, 1, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 2, 2, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 2, 3, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 2, 4, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 2, 5, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 3, 6, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 3, 7, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 3, 8, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 3, 9, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1'),
+  (1, 3, 10, 'Term 1 Tuition Fee', 'Academic year tuition for term 1', 15000.00, DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 2 MONTH), 'pending', YEAR(CURDATE()), 'Term 1');
 
--- ==================== STEP 16: AI SETTINGS ====================
-INSERT INTO ai_settings (school_id, branch_id, is_openai_enabled, openai_api_url, openai_model, max_tokens, temperature, is_student_access, is_teacher_monitor, allow_free_chat)
-SELECT s.id, b.id, true, 'http://localhost:11434/v1/chat/completions', 'llama3', 2048, 0.7, true, true, false
-FROM schools s, branches b WHERE s.code = 'GA';
+-- ==================== STEP 15: AI SETTINGS ====================
+INSERT INTO ai_settings (school_id, branch_id, is_openai_enabled, openai_api_url, openai_model, max_tokens, temperature, is_student_access, is_teacher_monitor, allow_free_chat) VALUES
+  (1, 2, 0, 'http://localhost:11434/v1/chat/completions', 'llama3', 2048, 0.7, 1, 1, 0),
+  (1, 3, 0, 'http://localhost:11434/v1/chat/completions', 'llama3', 2048, 0.7, 1, 1, 0);
 
--- ==================== STEP 17: CBC SKILLS ====================
-INSERT INTO skills (school_id, branch_id, name, code, strand, sub_strand, level, description)
-SELECT s.id, b.id, sk.name, sk.code, sk.strand, sk.sub_strand, sk.level, 'CBC aligned ' || sk.name || ' competency'
-FROM schools s, branches b,
-(VALUES ('Critical Thinking','CT','Core Competencies','Problem Solving','basic'),
-  ('Communication','COM','Core Competencies','Oral Communication','basic'),
-  ('Self-Management','SM','Core Competencies','Self-Discipline','basic'),
-  ('Digital Literacy','DL','Core Competencies','ICT Skills','intermediate'),
-  ('Collaboration','COL','Core Competencies','Teamwork','basic'),
-  ('Creativity & Imagination','CR','Core Competencies','Innovation','intermediate'),
-  ('Citizenship','CIT','Core Competencies','National Values','basic'),
-  ('Learning to Learn','LTL','Core Competencies','Study Skills','basic')) AS sk(name, code, strand, sub_strand, level)
-WHERE s.code = 'GA';
+-- ==================== STEP 16: CBC SKILLS ====================
+INSERT INTO skills (school_id, branch_id, name, code, strand, sub_strand, level, description) VALUES
+  -- Main Campus (school_id=1, branch_id=2)
+  (1, 2, 'Critical Thinking', 'CT', 'Core Competencies', 'Problem Solving', 'basic', 'CBC aligned Critical Thinking competency'),
+  (1, 2, 'Communication', 'COM', 'Core Competencies', 'Oral Communication', 'basic', 'CBC aligned Communication competency'),
+  (1, 2, 'Self-Management', 'SM', 'Core Competencies', 'Self-Discipline', 'basic', 'CBC aligned Self-Management competency'),
+  (1, 2, 'Digital Literacy', 'DL', 'Core Competencies', 'ICT Skills', 'intermediate', 'CBC aligned Digital Literacy competency'),
+  (1, 2, 'Collaboration', 'COL', 'Core Competencies', 'Teamwork', 'basic', 'CBC aligned Collaboration competency'),
+  (1, 2, 'Creativity & Imagination', 'CR', 'Core Competencies', 'Innovation', 'intermediate', 'CBC aligned Creativity & Imagination competency'),
+  (1, 2, 'Citizenship', 'CIT', 'Core Competencies', 'National Values', 'basic', 'CBC aligned Citizenship competency'),
+  (1, 2, 'Learning to Learn', 'LTL', 'Core Competencies', 'Study Skills', 'basic', 'CBC aligned Learning to Learn competency'),
+  -- West Campus (school_id=1, branch_id=3)
+  (1, 3, 'Critical Thinking', 'CT', 'Core Competencies', 'Problem Solving', 'basic', 'CBC aligned Critical Thinking competency'),
+  (1, 3, 'Communication', 'COM', 'Core Competencies', 'Oral Communication', 'basic', 'CBC aligned Communication competency'),
+  (1, 3, 'Self-Management', 'SM', 'Core Competencies', 'Self-Discipline', 'basic', 'CBC aligned Self-Management competency'),
+  (1, 3, 'Digital Literacy', 'DL', 'Core Competencies', 'ICT Skills', 'intermediate', 'CBC aligned Digital Literacy competency'),
+  (1, 3, 'Collaboration', 'COL', 'Core Competencies', 'Teamwork', 'basic', 'CBC aligned Collaboration competency'),
+  (1, 3, 'Creativity & Imagination', 'CR', 'Core Competencies', 'Innovation', 'intermediate', 'CBC aligned Creativity & Imagination competency'),
+  (1, 3, 'Citizenship', 'CIT', 'Core Competencies', 'National Values', 'basic', 'CBC aligned Citizenship competency'),
+  (1, 3, 'Learning to Learn', 'LTL', 'Core Competencies', 'Study Skills', 'basic', 'CBC aligned Learning to Learn competency');
 
--- ==================== STEP 18: MODULES ====================
+-- ==================== STEP 17: MODULES ====================
 INSERT INTO modules (name, version, description, is_core) VALUES
-  ('academic', '1.0.0', 'Academic management', true),
-  ('finance', '1.0.0', 'Fee management and payments', true),
-  ('attendance', '1.0.0', 'Student attendance tracking', true),
-  ('ai', '1.0.0', 'AI-powered learning assistant', false),
-  ('transport', '1.0.0', 'School transport management', false),
-  ('library', '1.0.0', 'Library and book management', false),
-  ('hostel', '1.0.0', 'Hostel and room management', false),
-  ('lms', '1.0.0', 'Learning management system', false),
-  ('communication', '1.0.0', 'Notifications and messaging', true),
-  ('reports', '1.0.0', 'School-wide reports and analytics', true);
+  ('academic', '1.0.0', 'Academic management', 1),
+  ('finance', '1.0.0', 'Fee management and payments', 1),
+  ('attendance', '1.0.0', 'Student attendance tracking', 1),
+  ('ai', '1.0.0', 'AI-powered learning assistant', 0),
+  ('transport', '1.0.0', 'School transport management', 0),
+  ('library', '1.0.0', 'Library and book management', 0),
+  ('hostel', '1.0.0', 'Hostel and room management', 0),
+  ('lms', '1.0.0', 'Learning management system', 0),
+  ('communication', '1.0.0', 'Notifications and messaging', 1),
+  ('reports', '1.0.0', 'School-wide reports and analytics', 1);
 
-INSERT INTO module_licenses (module_id, school_id, branch_id, is_enabled)
-SELECT m.id, s.id, b.id, true FROM modules m, schools s, branches b WHERE s.code = 'GA';
+INSERT INTO module_licenses (module_id, school_id, branch_id, is_enabled) VALUES
+  (1, 1, 2, 1),
+  (2, 1, 2, 1),
+  (3, 1, 2, 1),
+  (4, 1, 2, 1),
+  (5, 1, 2, 1),
+  (6, 1, 2, 1),
+  (7, 1, 2, 1),
+  (8, 1, 2, 1),
+  (9, 1, 2, 1),
+  (10, 1, 2, 1),
+  (1, 1, 3, 1),
+  (2, 1, 3, 1),
+  (3, 1, 3, 1),
+  (4, 1, 3, 1),
+  (5, 1, 3, 1),
+  (6, 1, 3, 1),
+  (7, 1, 3, 1),
+  (8, 1, 3, 1),
+  (9, 1, 3, 1),
+  (10, 1, 3, 1);
 
 -- ==================== DONE! ====================
+
+SET FOREIGN_KEY_CHECKS = 1;

@@ -5,40 +5,62 @@ declare(strict_types=1);
 namespace Core;
 
 /**
- * Supabase REST API Client
+ * MySQL PDO Database Client
  *
- * Communicates with the Supabase PostgREST API using PHP cURL.
+ * Communicates with a MySQL database using PHP PDO.
  * Supports full CRUD operations with filtering, ordering, pagination,
- * and column selection. Handles snake_case ↔ camelCase conversion.
+ * and column selection. Handles snake_case <-> camelCase conversion.
+ *
+ * Uses prepared statements exclusively to prevent SQL injection.
  */
 class Database
 {
-    /** @var string Supabase project URL */
-    private string $baseUrl;
-
-    /** @var string API key (service_role key for admin access, bypasses RLS) */
-    private string $apiKey;
-
-    /** @var int Default timeout for cURL requests in seconds */
-    private int $timeout = 30;
+    /** @var \PDO PDO connection instance */
+    private \PDO $pdo;
 
     /**
      * Create a new Database instance.
      *
-     * @param string $supabaseUrl  Full Supabase project URL (e.g. https://xxx.supabase.co)
-     * @param string $apiKey       Service role API key (secret key)
+     * @param string $host     Database host
+     * @param string $port     Database port
+     * @param string $database Database name
+     * @param string $username Database username
+     * @param string $password Database password
+     * @param string $charset  Connection charset (default: utf8mb4)
      */
-    public function __construct(string $supabaseUrl, string $apiKey)
-    {
-        $this->baseUrl = rtrim($supabaseUrl, '/');
-        $this->apiKey = $apiKey;
+    public function __construct(
+        string $host,
+        string $port,
+        string $database,
+        string $username,
+        string $password,
+        string $charset = 'utf8mb4'
+    ) {
+        $dsn = "mysql:host={$host};port={$port};dbname={$database};charset={$charset}";
+
+        try {
+            $this->pdo = new \PDO($dsn, $username, $password, [
+                \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                \PDO::ATTR_EMULATE_PREPARES   => false,
+            ]);
+        } catch (\PDOException $e) {
+            throw new \RuntimeException(
+                'Database connection failed: ' . $e->getMessage(),
+                (int) $e->getCode(),
+                $e
+            );
+        }
     }
 
     /**
-     * Execute a query against the Supabase REST API.
+     * Execute a query against the MySQL database.
+     *
+     * Main method supporting GET (SELECT), POST (INSERT), PATCH (UPDATE),
+     * and DELETE operations through a unified interface.
      *
      * @param string      $table   Table name in the database
-     * @param string      $method  HTTP method: GET, POST, PATCH, DELETE
+     * @param string      $method  HTTP-style method: GET, POST, PATCH, DELETE
      * @param array|null  $data    Data payload for POST/PATCH requests
      * @param array       $filters Associative array of filters: [column => [operator => value]]
      * @param string|null $order   Ordering string, e.g. "created_at.desc" or "name.asc"
@@ -46,7 +68,7 @@ class Database
      * @param int|null    $offset  Number of records to skip
      * @param string|null $select  Comma-separated list of columns to select
      * @return array              Response data as associative array
-     * @throws \RuntimeException  On cURL or API errors
+     * @throws \RuntimeException  On PDO or SQL errors
      */
     public function query(
         string $table,
@@ -59,82 +81,24 @@ class Database
         ?string $select = null
     ): array {
         $method = strtoupper($method);
-        $url = $this->baseUrl . '/rest/v1/' . $this->toSnakeCase($table);
+        $table = $this->toSnakeCase($table);
 
-        // Build query string for GET requests
-        $queryParams = [];
+        switch ($method) {
+            case 'GET':
+                return $this->executeSelect($table, $filters, $order, $limit, $offset, $select);
 
-        // Apply filters
-        foreach ($filters as $column => $conditions) {
-            $snakeColumn = $this->toSnakeCase($column);
-            foreach ($conditions as $operator => $value) {
-                $queryParams[] = $snakeColumn . '=' . $operator . '.' . urlencode((string) $value);
-            }
+            case 'POST':
+                return $this->executeInsert($table, $data ?? []);
+
+            case 'PATCH':
+                return $this->executeUpdate($table, $data ?? [], $filters);
+
+            case 'DELETE':
+                return $this->executeDelete($table, $filters);
+
+            default:
+                throw new \RuntimeException("Unsupported query method: {$method}");
         }
-
-        // Apply ordering
-        if ($order !== null) {
-            $queryParams[] = 'order=' . $this->toSnakeCase($order);
-        }
-
-        // Apply pagination
-        if ($limit !== null && $offset !== null) {
-            $queryParams[] = 'limit=' . $limit;
-            $queryParams[] = 'offset=' . $offset;
-        } elseif ($limit !== null) {
-            $queryParams[] = 'limit=' . $limit;
-        } elseif ($offset !== null) {
-            $queryParams[] = 'offset=' . $offset;
-        }
-
-        // Apply column selection
-        if ($select !== null) {
-            // Convert camelCase columns in select to snake_case
-            $columns = array_map([$this, 'toSnakeCase'], explode(',', $select));
-            $queryParams[] = 'select=' . implode(',', $columns);
-        }
-
-        if (!empty($queryParams)) {
-            $url .= '?' . implode('&', $queryParams);
-        }
-
-        // Prepare cURL
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_CUSTOMREQUEST  => $method,
-            CURLOPT_HTTPHEADER     => $this->buildHeaders($method),
-        ]);
-
-        // Attach body for POST/PATCH
-        if ($data !== null && in_array($method, ['POST', 'PATCH', 'DELETE'], true)) {
-            $snakeData = $this->arrayKeysToSnakeCase($data);
-            $jsonBody = json_encode($snakeData, JSON_THROW_ON_ERROR);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonBody);
-        }
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new \RuntimeException('cURL Error: ' . $curlError);
-        }
-
-        $decoded = json_decode($response ?: '[]', true);
-        if (!is_array($decoded)) {
-            $decoded = ['raw' => $response];
-        }
-
-        // Supabase returns an error object with "message" on failures
-        if (isset($decoded['message']) && $httpCode >= 400) {
-            throw new \RuntimeException('Supabase Error [' . $httpCode . ']: ' . $decoded['message']);
-        }
-
-        // Convert all keys to camelCase
-        return $this->arrayKeysToCamelCase($decoded);
     }
 
     /**
@@ -176,10 +140,10 @@ class Database
     /**
      * Find a record by its primary key (id column).
      *
-     * @param string $table   Table name
-     * @param mixed  $id      Primary key value
+     * @param string $table    Table name
+     * @param mixed  $id       Primary key value
      * @param string $idColumn Name of the primary key column (default: id)
-     * @return array|null     Record or null
+     * @return array|null      Record or null
      */
     public function find(string $table, $id, string $idColumn = 'id'): ?array
     {
@@ -191,7 +155,7 @@ class Database
      *
      * @param string $table Table name
      * @param array  $data  Record data
-     * @return array        Inserted record (with representation)
+     * @return array        Inserted record (fetched back from the DB)
      */
     public function insert(string $table, array $data): array
     {
@@ -258,111 +222,55 @@ class Database
      */
     public function count(string $table, array $filters = []): int
     {
-        // Supabase returns Content-Range header with total count
-        $url = $this->baseUrl . '/rest/v1/' . $this->toSnakeCase($table);
+        $table = $this->toSnakeCase($table);
+        $sql = "SELECT COUNT(*) AS total FROM `{$table}`";
+        $params = [];
+        $values = [];
 
-        $queryParams = [];
-        foreach ($filters as $column => $conditions) {
-            $snakeColumn = $this->toSnakeCase($column);
-            foreach ($conditions as $operator => $value) {
-                $queryParams[] = $snakeColumn . '=' . $operator . '.' . urlencode((string) $value);
-            }
+        [$whereClause, $params, $values] = $this->buildWhereClause($filters, $params, $values);
+
+        if ($whereClause !== '') {
+            $sql .= ' WHERE ' . $whereClause;
         }
 
-        if (!empty($queryParams)) {
-            $url .= '?' . implode('&', $queryParams);
-        }
+        $stmt = $this->executeStatement($sql, $params, $values);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_CUSTOMREQUEST  => 'HEAD',
-            CURLOPT_HTTPHEADER     => [
-                'apikey: ' . $this->apiKey,
-                'Authorization: Bearer ' . $this->apiKey,
-                'Prefer: count=exact',
-                'Range: 0-0',
-            ],
-            CURLOPT_NOBODY         => true,
-            CURLOPT_HEADER         => true,
-        ]);
-
-        $response = curl_exec($ch);
-        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        curl_close($ch);
-
-        $headers = substr($response ?: '', 0, $headerSize);
-
-        // Extract content-range header
-        if (preg_match('/content-range:\s*0-0\/(\d+)/i', $headers, $matches)) {
-            return (int) $matches[1];
-        }
-
-        return 0;
+        return (int) ($row['total'] ?? 0);
     }
 
     /**
-     * Execute a raw Supabase RPC (PostgreSQL function call).
+     * Execute a raw SQL query with optional bound parameters.
      *
-     * @param string $functionName RPC function name
-     * @param array  $params      Parameters to pass
-     * @return array              Function result
+     * @param string $sql    Raw SQL query string
+     * @param array  $params Array of values to bind (? placeholders)
+     * @return array         Array of result rows
+     * @throws \RuntimeException On PDO errors
      */
-    public function rpc(string $functionName, array $params = []): array
+    public function raw(string $sql, array $params = []): array
     {
-        $url = $this->baseUrl . '/rest/v1/rpc/' . $functionName;
+        $stmt = $this->pdo->prepare($sql);
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => $this->timeout,
-            CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => [
-                'apikey: ' . $this->apiKey,
-                'Authorization: Bearer ' . $this->apiKey,
-                'Content-Type: application/json',
-                'Prefer: return=representation',
-            ],
-            CURLOPT_POSTFIELDS     => json_encode($params, JSON_THROW_ON_ERROR),
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $decoded = json_decode($response ?: '[]', true);
-        if (!is_array($decoded)) {
-            $decoded = ['raw' => $response];
+        foreach ($params as $i => $value) {
+            $paramIndex = $i + 1;
+            $stmt->bindValue($paramIndex, $value, \PDO::PARAM_STR);
         }
 
-        if (isset($decoded['message']) && $httpCode >= 400) {
-            throw new \RuntimeException('RPC Error [' . $httpCode . ']: ' . $decoded['message']);
-        }
+        $stmt->execute();
 
-        return $this->arrayKeysToCamelCase($decoded);
+        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        return $this->arrayKeysToCamelCase($results);
     }
 
     /**
-     * Build HTTP headers for the API request.
+     * Return the last auto-increment ID inserted.
      *
-     * @param string $method HTTP method
-     * @return array        Array of header strings
+     * @return string Last insert ID
      */
-    private function buildHeaders(string $method): array
+    public function lastInsertId(): string
     {
-        $headers = [
-            'apikey: ' . $this->apiKey,
-            'Authorization: Bearer ' . $this->apiKey,
-            'Content-Type: application/json',
-        ];
-
-        // For mutations, request the server to return the affected rows
-        if (in_array($method, ['POST', 'PATCH', 'DELETE'], true)) {
-            $headers[] = 'Prefer: return=representation';
-        }
-
-        return $headers;
+        return $this->pdo->lastInsertId();
     }
 
     /**
@@ -386,6 +294,411 @@ class Database
     {
         return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $str));
     }
+
+    // ---------------------------------------------------------------------------
+    // Private execution helpers
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Execute a SELECT query.
+     *
+     * @param string      $table   Table name (already snake_case)
+     * @param array       $filters Filter conditions
+     * @param string|null $order   Ordering
+     * @param int|null    $limit   Limit
+     * @param int|null    $offset  Offset
+     * @param string|null $select  Columns
+     * @return array               Array of result rows
+     */
+    private function executeSelect(
+        string $table,
+        array $filters,
+        ?string $order,
+        ?int $limit,
+        ?int $offset,
+        ?string $select
+    ): array {
+        // Build SELECT columns
+        if ($select !== null && $select !== '') {
+            // Convert camelCase column names to snake_case
+            $columns = array_map([$this, 'toSnakeCase'], explode(',', $select));
+            // Filter out any Supabase-style embedded join references like "roles(name,id)"
+            $safeColumns = [];
+            foreach ($columns as $col) {
+                $col = trim($col);
+                if ($col !== '' && strpos($col, '(') === false) {
+                    $safeColumns[] = '`' . $col . '`';
+                }
+            }
+            $selectClause = !empty($safeColumns) ? implode(', ', $safeColumns) : '*';
+        } else {
+            $selectClause = '*';
+        }
+
+        $sql = "SELECT {$selectClause} FROM `{$table}`";
+        $params = [];
+        $values = [];
+
+        // Build WHERE from filters
+        [$whereClause, $params, $values] = $this->buildWhereClause($filters, $params, $values);
+        if ($whereClause !== '') {
+            $sql .= ' WHERE ' . $whereClause;
+        }
+
+        // Build ORDER BY
+        if ($order !== null && $order !== '') {
+            $sql .= $this->buildOrderByClause($order);
+        }
+
+        // Build LIMIT / OFFSET
+        if ($limit !== null) {
+            $sql .= ' LIMIT ' . (int) $limit;
+        }
+        if ($offset !== null) {
+            $sql .= ' OFFSET ' . (int) $offset;
+        }
+
+        $stmt = $this->executeStatement($sql, $params, $values);
+        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        return $this->arrayKeysToCamelCase($results);
+    }
+
+    /**
+     * Execute an INSERT query and return the new record.
+     *
+     * @param string $table Table name (already snake_case)
+     * @param array  $data  Data to insert
+     * @return array        Array containing the inserted record
+     */
+    private function executeInsert(string $table, array $data): array
+    {
+        $snakeData = $this->arrayKeysToSnakeCase($data);
+
+        if (empty($snakeData)) {
+            throw new \RuntimeException('Insert data cannot be empty.');
+        }
+
+        $columns = array_map(fn ($col) => '`' . $col . '`', array_keys($snakeData));
+        $placeholders = array_fill(0, count($snakeData), '?');
+
+        $sql = sprintf(
+            'INSERT INTO `%s` (%s) VALUES (%s)',
+            $table,
+            implode(', ', $columns),
+            implode(', ', $placeholders)
+        );
+
+        $values = array_values($snakeData);
+        $stmt = $this->executeStatement($sql, [], $values);
+
+        $lastId = $this->pdo->lastInsertId();
+
+        // Fetch the inserted record back
+        if ($lastId) {
+            $fetched = $this->single($this->toCamelCase($table), ['id' => ['eq' => $lastId]]);
+            return $fetched !== null ? [$fetched] : [];
+        }
+
+        // Fallback: return a minimal representation
+        $result = array_merge(['id' => $lastId], $snakeData);
+        return [$this->arrayKeysToCamelCase($result)];
+    }
+
+    /**
+     * Execute an UPDATE query and return the updated records.
+     *
+     * @param string $table   Table name (already snake_case)
+     * @param array  $data    Data to update
+     * @param array  $filters Filter conditions
+     * @return array          Array of updated records
+     */
+    private function executeUpdate(string $table, array $data, array $filters): array
+    {
+        $snakeData = $this->arrayKeysToSnakeCase($data);
+
+        if (empty($snakeData)) {
+            throw new \RuntimeException('Update data cannot be empty.');
+        }
+
+        $setParts = [];
+        $values = [];
+
+        foreach (array_keys($snakeData) as $col) {
+            $setParts[] = '`' . $col . '` = ?';
+            $values[] = $snakeData[$col];
+        }
+
+        $sql = sprintf(
+            'UPDATE `%s` SET %s',
+            $table,
+            implode(', ', $setParts)
+        );
+
+        $params = [];
+        [$whereClause, $params, $values] = $this->buildWhereClause($filters, $params, $values);
+
+        if ($whereClause !== '') {
+            $sql .= ' WHERE ' . $whereClause;
+        }
+
+        $this->executeStatement($sql, $params, $values);
+
+        // Fetch and return updated records
+        return $this->executeSelect($table, $filters, null, null, null, null);
+    }
+
+    /**
+     * Execute a DELETE query and return the deleted records.
+     *
+     * First fetches the matching records, then deletes them, and returns
+     * the previously-fetched data so callers receive the deleted records.
+     *
+     * @param string $table   Table name (already snake_case)
+     * @param array  $filters Filter conditions
+     * @return array          Array of deleted records
+     */
+    private function executeDelete(string $table, array $filters): array
+    {
+        // Fetch records before deleting so we can return them
+        $deleted = $this->executeSelect($table, $filters, null, null, null, null);
+
+        $sql = "DELETE FROM `{$table}`";
+        $params = [];
+        $values = [];
+
+        [$whereClause, $params, $values] = $this->buildWhereClause($filters, $params, $values);
+
+        if ($whereClause !== '') {
+            $sql .= ' WHERE ' . $whereClause;
+        } else {
+            throw new \RuntimeException('DELETE requires filters to prevent accidental full-table deletion.');
+        }
+
+        $this->executeStatement($sql, $params, $values);
+
+        return $deleted;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Query building helpers
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Build a WHERE clause from the filters array.
+     *
+     * @param array $filters  Filter conditions: [column => [operator => value]]
+     * @param array $params   Reference to params array (for named params, unused — we use positional)
+     * @param array $values   Reference to values array for binding
+     * @return array          [whereClause string, params array, values array]
+     */
+    private function buildWhereClause(array $filters, array $params, array $values): array
+    {
+        $clauses = [];
+
+        foreach ($filters as $column => $conditions) {
+            $snakeColumn = $this->toSnakeCase((string) $column);
+
+            foreach ($conditions as $operator => $value) {
+                $clause = $this->buildFilterExpression($snakeColumn, $operator, $value, $values);
+                if ($clause !== null) {
+                    $clauses[] = $clause;
+                }
+            }
+        }
+
+        $whereClause = !empty($clauses) ? implode(' AND ', $clauses) : '';
+
+        return [$whereClause, $params, $values];
+    }
+
+    /**
+     * Build a single filter expression for a column + operator + value.
+     *
+     * @param string $column   Column name (snake_case, backtick-quoted)
+     * @param string $operator Operator (eq, neq, gt, lt, gte, lte, like, ilike, in, not_in, is, is_not, not_null, null)
+     * @param mixed  $value    Filter value
+     * @param array  $values   Reference to values array for binding
+     * @return string|null     SQL expression or null
+     */
+    private function buildFilterExpression(string $column, string $operator, $value, array &$values): ?string
+    {
+        $quotedCol = '`' . $column . '`';
+
+        switch ($operator) {
+            case 'eq':
+                $values[] = $value;
+                return $quotedCol . ' = ?';
+
+            case 'neq':
+                $values[] = $value;
+                return $quotedCol . ' != ?';
+
+            case 'gt':
+                $values[] = $value;
+                return $quotedCol . ' > ?';
+
+            case 'lt':
+                $values[] = $value;
+                return $quotedCol . ' < ?';
+
+            case 'gte':
+                $values[] = $value;
+                return $quotedCol . ' >= ?';
+
+            case 'lte':
+                $values[] = $value;
+                return $quotedCol . ' <= ?';
+
+            case 'like':
+            case 'ilike':
+                $values[] = $value;
+                return $quotedCol . ' LIKE ?';
+
+            case 'in':
+                if (!is_array($value) || empty($value)) {
+                    return null;
+                }
+                $placeholders = array_fill(0, count($value), '?');
+                foreach ($value as $v) {
+                    $values[] = $v;
+                }
+                return $quotedCol . ' IN (' . implode(', ', $placeholders) . ')';
+
+            case 'not_in':
+                if (!is_array($value) || empty($value)) {
+                    return null;
+                }
+                $placeholders = array_fill(0, count($value), '?');
+                foreach ($value as $v) {
+                    $values[] = $v;
+                }
+                return $quotedCol . ' NOT IN (' . implode(', ', $placeholders) . ')';
+
+            case 'is':
+                return $quotedCol . ' IS ' . $this->toSqlValue($value);
+
+            case 'is_not':
+                return $quotedCol . ' IS NOT ' . $this->toSqlValue($value);
+
+            case 'not_null':
+                return $quotedCol . ' IS NOT NULL';
+
+            case 'null':
+                return $quotedCol . ' IS NULL';
+
+            default:
+                throw new \RuntimeException("Unsupported filter operator: {$operator}");
+        }
+    }
+
+    /**
+     * Convert a PHP value to its SQL literal representation for IS / IS NOT.
+     *
+     * @param mixed $value PHP value
+     * @return string      SQL literal
+     */
+    private function toSqlValue($value): string
+    {
+        if ($value === null) {
+            return 'NULL';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'TRUE' : 'FALSE';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if (strtolower((string) $value) === 'null') {
+            return 'NULL';
+        }
+
+        if (strtolower((string) $value) === 'true') {
+            return 'TRUE';
+        }
+
+        if (strtolower((string) $value) === 'false') {
+            return 'FALSE';
+        }
+
+        // String value — quote and escape for safety
+        return $this->pdo->quote((string) $value);
+    }
+
+    /**
+     * Build an ORDER BY clause from a Supabase-style order string.
+     *
+     * @param string $order Order string, e.g. "created_at.desc" or "name.asc"
+     * @return string       SQL ORDER BY clause
+     */
+    private function buildOrderByClause(string $order): string
+    {
+        $parts = [];
+
+        // Support multiple order columns separated by commas
+        $orderSegments = explode(',', $order);
+
+        foreach ($orderSegments as $segment) {
+            $segment = trim($segment);
+            if ($segment === '') {
+                continue;
+            }
+
+            $pieces = explode('.', $segment, 2);
+            $column = $this->toSnakeCase($pieces[0]);
+            $direction = strtoupper($pieces[1] ?? 'ASC');
+
+            if (!in_array($direction, ['ASC', 'DESC'], true)) {
+                $direction = 'ASC';
+            }
+
+            $parts[] = '`' . $column . '` ' . $direction;
+        }
+
+        if (empty($parts)) {
+            return '';
+        }
+
+        return ' ORDER BY ' . implode(', ', $parts);
+    }
+
+    /**
+     * Execute a prepared statement with positional parameters.
+     *
+     * @param string $sql    SQL query with ? placeholders
+     * @param array  $params Unused (for API compatibility)
+     * @param array  $values Values to bind
+     * @return \PDOStatement
+     * @throws \RuntimeException
+     */
+    private function executeStatement(string $sql, array $params, array $values): \PDOStatement
+    {
+        try {
+            $stmt = $this->pdo->prepare($sql);
+
+            foreach ($values as $i => $value) {
+                $paramIndex = $i + 1;
+                $stmt->bindValue($paramIndex, $value, \PDO::PARAM_STR);
+            }
+
+            $stmt->execute();
+
+            return $stmt;
+        } catch (\PDOException $e) {
+            throw new \RuntimeException(
+                'Query Error [' . $e->getCode() . ']: ' . $e->getMessage() . ' — SQL: ' . $sql,
+                (int) $e->getCode(),
+                $e
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Case conversion helpers
+    // ---------------------------------------------------------------------------
 
     /**
      * Recursively convert all array keys from snake_case to camelCase.
