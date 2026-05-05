@@ -102,15 +102,23 @@ $icons = [
     'attendance' => '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>',
     'communication' => '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>',
     'reports' => '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+    'globe' => '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>',
+    'admission' => '<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+    'list' => '<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>',
+    'image' => '<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>',
 ];
 
 // Menu configuration
 $academicChildSlugs = ['classes', 'subjects', 'exams', 'results', 'timetable', 'skills'];
 $financeChildSlugs = ['fees', 'payments'];
 $aiChildSlugs = ['ai-chat', 'ai-settings', 'ai-analytics'];
+$websiteChildSlugs = ['website', 'website/pages', 'website/settings', 'website/menu', 'website/media'];
+$admissionChildSlugs = ['admission', 'admission/settings', 'admission/fields', 'admission/applications'];
 $academicOpen = isParentActive($currentPage, $academicChildSlugs);
 $financeOpen = isParentActive($currentPage, $financeChildSlugs);
 $aiOpen = isParentActive($currentPage, $aiChildSlugs);
+$websiteOpen = isParentActive($currentPage, $websiteChildSlugs);
+$admissionOpen = isParentActive($currentPage, $admissionChildSlugs);
 ?>
 
 <!-- Sidebar -->
@@ -238,6 +246,33 @@ $aiOpen = isParentActive($currentPage, $aiChildSlugs);
             <!-- Reports -->
             <?php if (hasRole($userRoles, ['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant'])): ?>
                 <?= renderMenuItem('reports', $icons['reports'], 'Reports', $currentPage) ?>
+            <?php endif; ?>
+
+            <!-- Website (submenu) -->
+            <?php if (hasRole($userRoles, ['SuperAdmin', 'SchoolAdmin'])): ?>
+                <div class="mt-1">
+                    <?= renderSubmenuToggle('submenu-website', $icons['globe'], 'Website', 'submenu-website-arrow', $currentPage, $websiteChildSlugs) ?>
+                    <div id="submenu-website" class="mt-1 ml-4 space-y-0.5 <?= $websiteOpen ? '' : 'hidden' ?>">
+                        <?= renderSubmenuItem('website', $icons['globe'], 'Dashboard', $currentPage) ?>
+                        <?= renderSubmenuItem('website/pages', $icons['clipboard'], 'Pages', $currentPage) ?>
+                        <?= renderSubmenuItem('website/settings', $icons['settings'], 'Settings', $currentPage) ?>
+                        <?= renderSubmenuItem('website/menu', $icons['list'], 'Menu', $currentPage) ?>
+                        <?= renderSubmenuItem('website/media', $icons['image'], 'Media', $currentPage) ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Admission (submenu) -->
+            <?php if (hasRole($userRoles, ['SuperAdmin', 'SchoolAdmin'])): ?>
+                <div class="mt-1">
+                    <?= renderSubmenuToggle('submenu-admission', $icons['admission'], 'Admission', 'submenu-admission-arrow', $currentPage, $admissionChildSlugs) ?>
+                    <div id="submenu-admission" class="mt-1 ml-4 space-y-0.5 <?= $admissionOpen ? '' : 'hidden' ?>">
+                        <?= renderSubmenuItem('admission', $icons['admission'], 'Dashboard', $currentPage) ?>
+                        <?= renderSubmenuItem('admission/settings', $icons['settings'], 'Settings', $currentPage) ?>
+                        <?= renderSubmenuItem('admission/fields', $icons['clipboard'], 'Form Fields', $currentPage) ?>
+                        <?= renderSubmenuItem('admission/applications', $icons['admission'], 'Applications', $currentPage) ?>
+                    </div>
+                </div>
             <?php endif; ?>
 
         </nav>
