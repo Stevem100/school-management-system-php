@@ -1,105 +1,34 @@
 <?php
 
-namespace App\Controllers;
+declare(strict_types=1);
 
-use App\Core\Auth;
-use App\Core\Request;
-use App\Core\Session;
-use App\Core\Response;
-use App\Core\CSRF;
-use App\Core\View;
+namespace App\Controllers;
 
 /**
  * FeeController
  *
- * Manages fee structures and fee items (line items) for the school.
- * Supports CRUD operations on fee_structures and fee_items tables.
+ * Manages fee structures and fee items for the school.
+ * Uses MySQL database for all CRUD operations.
  */
-class FeeController
+class FeeController extends Controller
 {
     /**
-     * @var Auth
-     */
-    private $auth;
-
-    /**
-     * @var Session
-     */
-    private $session;
-
-    /**
-     * @var Request
-     */
-    private $request;
-
-    /**
-     * @var CSRF
-     */
-    private $csrf;
-
-    /**
-     * @var View
-     */
-    private $view;
-
-    /**
-     * Supabase API configuration
-     */
-    private $supabaseUrl;
-    private $supabaseKey;
-
-    public function __construct()
-    {
-        $this->auth    = new Auth();
-        $this->session = new Session();
-        $this->request = new Request();
-        $this->csrf    = new CSRF();
-        $this->view    = new View();
-
-        $this->supabaseUrl = getenv('SUPABASE_URL') ?: 'https://example.supabase.co';
-        $this->supabaseKey = getenv('SUPABASE_ANON_KEY') ?: '';
-    }
-
-    // ─────────────────────────────────────────────────────────
-    //  Web Routes
-    // ─────────────────────────────────────────────────────────
-
-    /**
      * Fee structures index page.
-     *
-     * Displays all fee structures with summary cards and a data table.
      */
     public function index(): void
     {
-        if (!$this->auth->check()) {
-            $this->session->flash('error', 'Please log in to access this page.');
-            $this->redirect('/login');
-            return;
-        }
+        $this->requireAuth();
 
-        $user = $this->auth->user();
+        $feeStructures = $this->fetchFeeStructures();
+        $stats = $this->fetchFeeStats();
+        $classes = $this->fetchClasses();
 
-        // Fetch fee structures
-        $feeStructures = $this->fetchFeeStructures($user);
-
-        // Fetch summary stats
-        $stats = $this->fetchFeeStats($user);
-
-        // Fetch classes for the dropdown
-        $classes = $this->fetchClasses($user);
-
-        $flashSuccess = $this->session->getFlash('success');
-        $flashError   = $this->session->getFlash('error');
-
-        $this->view->renderWithLayout('fees/index', 'layouts/app', [
+        $this->renderWithLayout('fees/index', [
             'pageTitle'     => 'Fee Management',
-            'user'          => $user,
             'currentPage'   => 'fees',
             'feeStructures' => $feeStructures,
             'stats'         => $stats,
             'classes'       => $classes,
-            'flashSuccess'  => $flashSuccess,
-            'flashError'    => $flashError,
         ]);
     }
 
@@ -107,71 +36,43 @@ class FeeController
     //  API Routes (JSON responses)
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * List all fee structures as JSON.
-     * GET /api/fees
-     */
     public function apiIndex(): void
     {
-        Response::jsonHeaders();
-
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $user = $this->auth->user();
-        $feeStructures = $this->fetchFeeStructures($user);
-
-        Response::json([
-            'success' => true,
-            'data'    => $feeStructures,
-        ], 200);
+        $this->requireAuth();
+        $this->success($this->fetchFeeStructures());
     }
 
-    /**
-     * Create a new fee structure.
-     * POST /api/fees
-     */
     public function apiStore(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $user  = $this->auth->user();
-
-        // Validate required fields
+        $input = $this->requestJson();
         $errors = $this->validateFeeStructure($input);
+
         if (!empty($errors)) {
-            Response::json(['success' => false, 'error' => 'Validation failed.', 'errors' => $errors], 422);
+            $this->error('Validation failed.', 422, $errors);
             return;
         }
 
-        // Build fee structure data
-        $data = [
-            'school_id'     => $user['school_id'] ?? 1,
-            'branch_id'     => $user['branch_id'] ?? 1,
-            'class_id'      => $input['class_id'],
-            'term'          => $input['term'],
-            'academic_year' => $input['academic_year'],
-            'total_amount'  => $input['total_amount'],
-            'description'   => $input['description'] ?? '',
-            'status'        => $input['status'] ?? 'active',
-        ];
+        try {
+            $data = [
+                'school_id'     => $this->currentUserId(),
+                'branch_id'     => $input['branch_id'] ?? null,
+                'class_id'      => $input['class_id'],
+                'term'          => $input['term'],
+                'academic_year' => $input['academic_year'],
+                'total_amount'  => $input['total_amount'],
+                'description'   => $input['description'] ?? '',
+                'status'        => $input['status'] ?? 'active',
+            ];
 
-        $result = $this->supabaseInsert('fee_structures', $data);
+            $result = $this->db->insert('fee_structures', $data);
 
-        if ($result) {
-            // Create fee items if provided
-            if (!empty($input['items'])) {
+            if (!empty($input['items']) && is_array($input['items'])) {
                 foreach ($input['items'] as $item) {
-                    $this->supabaseInsert('fee_items', [
-                        'fee_structure_id' => $result['id'],
+                    $this->db->insert('fee_items', [
+                        'fee_structure_id' => $result['id'] ?? 0,
                         'name'             => $item['name'],
                         'amount'           => $item['amount'],
                         'description'      => $item['description'] ?? '',
@@ -179,367 +80,174 @@ class FeeController
                 }
             }
 
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Fee structure created successfully.'], 201);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to create fee structure.'], 500);
+            $this->success($result, 'Fee structure created successfully.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to create fee structure: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Update a fee structure.
-     * PUT /api/fees/{id}
-     */
     public function apiUpdate(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $id    = $input['id'] ?? $this->request->get('id', '');
+        $input = $this->requestJson();
+        $id = $input['id'] ?? '';
 
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Fee structure ID is required.'], 422);
+            $this->error('Fee structure ID is required.', 422);
             return;
         }
 
-        $data = array_filter([
-            'class_id'      => $input['class_id'] ?? null,
-            'term'          => $input['term'] ?? null,
-            'academic_year' => $input['academic_year'] ?? null,
-            'total_amount'  => $input['total_amount'] ?? null,
-            'description'   => $input['description'] ?? null,
-            'status'        => $input['status'] ?? null,
-        ], fn($v) => $v !== null);
+        try {
+            $data = array_filter([
+                'class_id'      => $input['class_id'] ?? null,
+                'term'          => $input['term'] ?? null,
+                'academic_year' => $input['academic_year'] ?? null,
+                'total_amount'  => $input['total_amount'] ?? null,
+                'description'   => $input['description'] ?? null,
+                'status'        => $input['status'] ?? null,
+            ], fn($v) => $v !== null);
 
-        $result = $this->supabaseUpdate('fee_structures', $id, $data);
-
-        if ($result) {
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Fee structure updated successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to update fee structure.'], 500);
+            $result = $this->db->updateById('fee_structures', $id, $data);
+            $this->success($result, 'Fee structure updated successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to update fee structure: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Delete a fee structure.
-     * DELETE /api/fees/{id}
-     */
     public function apiDestroy(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $id = $this->request->get('id', '');
+        $id = $this->input('id', '');
 
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Fee structure ID is required.'], 422);
+            $this->error('Fee structure ID is required.', 422);
             return;
         }
 
-        // Delete associated fee items first
-        $this->supabaseDelete('fee_items', 'fee_structure_id', $id);
+        try {
+            // Delete associated fee items first
+            $items = $this->db->select('fee_items', ['fee_structure_id' => ['eq' => $id]]);
+            foreach ($items as $item) {
+                $this->db->deleteById('fee_items', $item['id']);
+            }
 
-        $result = $this->supabaseDelete('fee_structures', 'id', $id);
-
-        if ($result) {
-            Response::json(['success' => true, 'message' => 'Fee structure deleted successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to delete fee structure.'], 500);
+            $this->db->deleteById('fee_structures', $id);
+            $this->success(null, 'Fee structure deleted successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to delete fee structure: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Get fee items for a fee structure.
-     * GET /api/fees/{id}/items
-     */
     public function apiItems(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $feeStructureId = $this->request->get('id', '');
+        $feeStructureId = $this->input('id', '');
 
         if (empty($feeStructureId)) {
-            Response::json(['success' => false, 'error' => 'Fee structure ID is required.'], 422);
+            $this->error('Fee structure ID is required.', 422);
             return;
         }
 
-        $items = $this->supabaseFetch("fee_items?fee_structure_id=eq.{$feeStructureId}&select=*&order=name");
-
-        Response::json([
-            'success' => true,
-            'data'    => $items ?: [],
-        ], 200);
+        try {
+            $items = $this->db->select('fee_items', ['fee_structure_id' => ['eq' => $feeStructureId]], 'name.asc');
+            $this->success($items);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to fetch fee items: ' . $e->getMessage(), 500);
+        }
     }
 
     // ─────────────────────────────────────────────────────────
-    //  Private Data Fetching Methods
+    //  Data Fetching
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * Fetch all fee structures for the school/branch.
-     */
-    private function fetchFeeStructures(array $user): array
+    private function fetchFeeStructures(): array
     {
-        $branchFilter = '';
-        $branchId = $user['branch_id'] ?? null;
-        if ($branchId) {
-            $branchFilter = "&branch_id=eq.{$branchId}";
+        try {
+            return $this->db->raw(
+                "SELECT fs.*, c.name as class_name
+                 FROM fee_structures fs
+                 LEFT JOIN classes c ON fs.class_id = c.id
+                 ORDER BY fs.created_at DESC"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        $data = $this->supabaseFetch("fee_structures?select=*&order=created_at.desc{$branchFilter}");
-
-        if (empty($data)) {
-            // Return sample data for demonstration
-            return [
-                [
-                    'id'            => '1',
-                    'class_id'      => '1',
-                    'class_name'    => 'Form 1A',
-                    'term'          => 'Term 1',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 45000,
-                    'description'   => 'Tuition and boarding fees for Form 1',
-                    'status'        => 'active',
-                    'created_at'    => '2024-09-01T00:00:00',
-                ],
-                [
-                    'id'            => '2',
-                    'class_id'      => '2',
-                    'class_name'    => 'Form 2A',
-                    'term'          => 'Term 1',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 48000,
-                    'description'   => 'Tuition and boarding fees for Form 2',
-                    'status'        => 'active',
-                    'created_at'    => '2024-09-01T00:00:00',
-                ],
-                [
-                    'id'            => '3',
-                    'class_id'      => '3',
-                    'class_name'    => 'Form 3A',
-                    'term'          => 'Term 1',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 52000,
-                    'description'   => 'Tuition and boarding fees for Form 3',
-                    'status'        => 'active',
-                    'created_at'    => '2024-09-01T00:00:00',
-                ],
-                [
-                    'id'            => '4',
-                    'class_id'      => '4',
-                    'class_name'    => 'Form 4A',
-                    'term'          => 'Term 1',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 55000,
-                    'description'   => 'Tuition and boarding fees for Form 4',
-                    'status'        => 'active',
-                    'created_at'    => '2024-09-01T00:00:00',
-                ],
-                [
-                    'id'            => '5',
-                    'class_id'      => '1',
-                    'class_name'    => 'Form 1A',
-                    'term'          => 'Term 2',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 42000,
-                    'description'   => 'Tuition and boarding fees for Form 1 - Term 2',
-                    'status'        => 'draft',
-                    'created_at'    => '2024-11-15T00:00:00',
-                ],
-                [
-                    'id'            => '6',
-                    'class_id'      => '2',
-                    'class_name'    => 'Form 2A',
-                    'term'          => 'Term 2',
-                    'academic_year' => '2024-2025',
-                    'total_amount'  => 45000,
-                    'description'   => 'Tuition and boarding fees for Form 2 - Term 2',
-                    'status'        => 'draft',
-                    'created_at'    => '2024-11-15T00:00:00',
-                ],
-            ];
-        }
-
-        return $data;
     }
 
-    /**
-     * Fetch fee summary statistics.
-     */
-    private function fetchFeeStats(array $user): array
+    private function fetchFeeStats(): array
     {
-        return [
-            'total_collected'   => 1245000,
-            'outstanding'       => 387500,
-            'total_structures'  => 12,
-            'pending_payments'  => 45,
-        ];
+        try {
+            $collected = $this->db->raw("SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'completed'");
+            $outstanding = $this->db->raw("SELECT COUNT(*) as cnt FROM fee_structures WHERE status = 'active'");
+            $pending = $this->db->raw("SELECT COUNT(*) as cnt FROM payments WHERE status = 'pending'");
+
+            return [
+                'total_collected'  => (float) ($collected[0]['total'] ?? 0),
+                'outstanding'      => (int) ($outstanding[0]['cnt'] ?? 0),
+                'total_structures' => 0,
+                'pending_payments' => (int) ($pending[0]['cnt'] ?? 0),
+            ];
+        } catch (\RuntimeException $e) {
+            return ['total_collected' => 0, 'outstanding' => 0, 'total_structures' => 0, 'pending_payments' => 0];
+        }
     }
 
-    /**
-     * Fetch classes for dropdown.
-     */
-    private function fetchClasses(array $user): array
+    private function fetchClasses(): array
     {
-        $classes = $this->supabaseFetch('classes?select=id,name&order=name');
-
-        if (empty($classes)) {
-            return [
-                ['id' => '1', 'name' => 'Form 1A'],
-                ['id' => '2', 'name' => 'Form 1B'],
-                ['id' => '3', 'name' => 'Form 2A'],
-                ['id' => '4', 'name' => 'Form 2B'],
-                ['id' => '5', 'name' => 'Form 3A'],
-                ['id' => '6', 'name' => 'Form 3B'],
-                ['id' => '7', 'name' => 'Form 4A'],
-                ['id' => '8', 'name' => 'Form 4B'],
-            ];
+        try {
+            return $this->db->select('classes', [], 'name.asc');
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $classes;
     }
 
     // ─────────────────────────────────────────────────────────
     //  Validation
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * Validate fee structure input.
-     *
-     * @return array Array of error messages (empty if valid)
-     */
     private function validateFeeStructure(array $input): array
     {
         $errors = [];
-
-        if (empty($input['class_id'])) {
-            $errors['class_id'] = 'Class is required.';
-        }
-        if (empty($input['term'])) {
-            $errors['term'] = 'Term is required.';
-        }
-        if (empty($input['academic_year'])) {
-            $errors['academic_year'] = 'Academic year is required.';
-        }
+        if (empty($input['class_id'])) $errors['class_id'] = 'Class is required.';
+        if (empty($input['term'])) $errors['term'] = 'Term is required.';
+        if (empty($input['academic_year'])) $errors['academic_year'] = 'Academic year is required.';
         if (empty($input['total_amount']) || !is_numeric($input['total_amount']) || (float) $input['total_amount'] <= 0) {
             $errors['total_amount'] = 'Total amount must be a positive number.';
         }
-
         return $errors;
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  Supabase Helpers
-    // ─────────────────────────────────────────────────────────
-
-    private function supabaseFetch(string $query): ?array
+    private function requestJson(): array
     {
-        $url  = "{$this->supabaseUrl}/rest/v1/{$query}";
-        $url .= '&apikey=' . urlencode($this->supabaseKey);
-
-        $context = stream_context_create([
-            'http' => [
-                'method'           => 'GET',
-                'header'           => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n",
-                'timeout'          => 10,
-                'ignore_errors'    => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            return null;
-        }
-
-        return json_decode($response, true);
-    }
-
-    private function supabaseInsert(string $table, array $data): ?array
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation",
-                'content'       => json_encode($data),
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            return null;
-        }
-
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
-    }
-
-    private function supabaseUpdate(string $table, string $id, array $data): ?array
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?id=eq.{$id}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'PATCH',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation",
-                'content'       => json_encode($data),
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            return null;
-        }
-
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
-    }
-
-    private function supabaseDelete(string $table, string $column, string $value): bool
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?{$column}=eq.{$value}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'DELETE',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n",
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-        return $response !== false;
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
     }
 
     // ─────────────────────────────────────────────────────────
-    //  Private Helpers
+    //  Web CRUD Stubs (routes redirect to index)
     // ─────────────────────────────────────────────────────────
 
-    private function redirect(string $url): void
+    public function create(): void { $this->index(); }
+    public function store(): void { $this->redirect('/fees'); }
+    public function show(string $id): void { $this->index(); }
+    public function edit(string $id): void { $this->index(); }
+    public function update(string $id): void { $this->redirect('/fees'); }
+    public function delete(string $id): void { $this->redirect('/fees'); }
+
+    // Missing API methods
+    public function apiShow(): void
     {
-        header('Location: ' . $url);
-        exit;
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $item = $this->db->find('fee_structures', $id);
+        $this->success($item);
     }
+
+    public function apiDelete(): void { $this->apiDestroy(); }
 }

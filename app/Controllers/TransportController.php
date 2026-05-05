@@ -1,313 +1,346 @@
 <?php
 
-namespace App\Controllers;
+declare(strict_types=1);
 
-use App\Core\Auth;
-use App\Core\Request;
-use App\Core\Session;
-use App\Core\Response;
-use App\Core\CSRF;
-use App\Core\View;
+namespace App\Controllers;
 
 /**
  * TransportController
  *
  * Manages school transport: routes, vehicles, and student assignments.
- * CRUD for transport_routes, transport_vehicles, and transport_assignments.
+ * Uses MySQL database for all CRUD operations.
  */
-class TransportController
+class TransportController extends Controller
 {
-    private $auth;
-    private $session;
-    private $request;
-    private $csrf;
-    private $view;
-    private $supabaseUrl;
-    private $supabaseKey;
-
-    public function __construct()
-    {
-        $this->auth    = new Auth();
-        $this->session = new Session();
-        $this->request = new Request();
-        $this->csrf    = new CSRF();
-        $this->view    = new View();
-
-        $this->supabaseUrl = getenv('SUPABASE_URL') ?: 'https://example.supabase.co';
-        $this->supabaseKey = getenv('SUPABASE_ANON_KEY') ?: '';
-    }
-
-    // ─────────────────────────────────────────────────────────
-    //  Web Routes
-    // ─────────────────────────────────────────────────────────
-
+    /**
+     * Transport index page.
+     */
     public function index(): void
     {
-        if (!$this->auth->check()) {
-            $this->session->flash('error', 'Please log in to access this page.');
-            $this->redirect('/login');
-            return;
-        }
+        $this->requireAuth();
 
-        $user = $this->auth->user();
+        $routes      = $this->fetchRoutes();
+        $vehicles    = $this->fetchVehicles();
+        $assignments = $this->fetchAssignments();
+        $students    = $this->fetchStudents();
+        $stats       = $this->fetchTransportStats();
 
-        $routes      = $this->fetchRoutes($user);
-        $vehicles    = $this->fetchVehicles($user);
-        $assignments = $this->fetchAssignments($user);
-        $students    = $this->fetchStudents($user);
-        $stats       = $this->fetchTransportStats($user);
-
-        $flashSuccess = $this->session->getFlash('success');
-        $flashError   = $this->session->getFlash('error');
-
-        $this->view->renderWithLayout('transport/index', 'layouts/app', [
+        $this->renderWithLayout('transport/index', [
             'pageTitle'    => 'Transport',
-            'user'         => $user,
             'currentPage'  => 'transport',
             'routes'       => $routes,
             'vehicles'     => $vehicles,
             'assignments'  => $assignments,
             'students'     => $students,
             'stats'        => $stats,
-            'flashSuccess' => $flashSuccess,
-            'flashError'   => $flashError,
         ]);
     }
 
     // ─────────────────────────────────────────────────────────
-    //  API Routes
+    //  API Routes - Routes
     // ─────────────────────────────────────────────────────────
 
     public function apiRoutes(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
-        $routes = $this->fetchRoutes($this->auth->user());
-        Response::json(['success' => true, 'data' => $routes], 200);
+        $this->requireAuth();
+        $this->success($this->fetchRoutes());
     }
 
     public function apiStoreRoute(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        $input = $this->request->jsonBody();
-        $user  = $this->auth->user();
-
+        $input = $this->requestJson();
         $errors = $this->validateRoute($input);
-        if (!empty($errors)) { Response::json(['success' => false, 'error' => 'Validation failed.', 'errors' => $errors], 422); return; }
+        if (!empty($errors)) {
+            $this->error('Validation failed.', 422, $errors);
+            return;
+        }
 
-        $data = [
-            'school_id' => $user['school_id'] ?? 1,
-            'name'      => $input['name'],
-            'description' => $input['description'] ?? '',
-            'stops'     => json_encode($input['stops'] ?? []),
-            'driver_id' => $input['driver_id'] ?? null,
-            'vehicle_id'=> $input['vehicle_id'] ?? null,
-            'status'    => $input['status'] ?? 'active',
-        ];
+        try {
+            $data = [
+                'name'        => $input['name'],
+                'description' => $input['description'] ?? '',
+                'stops'       => json_encode($input['stops'] ?? []),
+                'driver_id'   => $input['driver_id'] ?? null,
+                'vehicle_id'  => $input['vehicle_id'] ?? null,
+                'status'      => $input['status'] ?? 'active',
+            ];
 
-        $result = $this->supabaseInsert('transport_routes', $data);
-        $result ? Response::json(['success' => true, 'data' => $result, 'message' => 'Route created successfully.'], 201)
-                : Response::json(['success' => false, 'error' => 'Failed to create route.'], 500);
+            $result = $this->db->insert('transport_routes', $data);
+            $this->success($result, 'Route created successfully.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to create route: ' . $e->getMessage(), 500);
+        }
     }
 
     public function apiUpdateRoute(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        $input = $this->request->jsonBody();
-        $id    = $input['id'] ?? '';
-        if (empty($id)) { Response::json(['success' => false, 'error' => 'Route ID is required.'], 422); return; }
+        $input = $this->requestJson();
+        $id = $input['id'] ?? '';
+        if (empty($id)) {
+            $this->error('Route ID is required.', 422);
+            return;
+        }
 
-        $data = array_filter([
-            'name'        => $input['name'] ?? null,
-            'description' => $input['description'] ?? null,
-            'stops'       => isset($input['stops']) ? json_encode($input['stops']) : null,
-            'driver_id'   => $input['driver_id'] ?? null,
-            'vehicle_id'  => $input['vehicle_id'] ?? null,
-            'status'      => $input['status'] ?? null,
-        ], fn($v) => $v !== null);
+        try {
+            $data = array_filter([
+                'name'        => $input['name'] ?? null,
+                'description' => $input['description'] ?? null,
+                'stops'       => isset($input['stops']) ? json_encode($input['stops']) : null,
+                'driver_id'   => $input['driver_id'] ?? null,
+                'vehicle_id'  => $input['vehicle_id'] ?? null,
+                'status'      => $input['status'] ?? null,
+            ], fn($v) => $v !== null);
 
-        $result = $this->supabaseUpdate('transport_routes', $id, $data);
-        $result ? Response::json(['success' => true, 'data' => $result, 'message' => 'Route updated.'], 200)
-                : Response::json(['success' => false, 'error' => 'Failed to update route.'], 500);
+            $result = $this->db->updateById('transport_routes', $id, $data);
+            $this->success($result, 'Route updated.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to update route: ' . $e->getMessage(), 500);
+        }
     }
 
     public function apiDestroyRoute(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
-        $id = $this->request->get('id', '');
-        if (empty($id)) { Response::json(['success' => false, 'error' => 'Route ID is required.'], 422); return; }
-        $this->supabaseDelete('transport_assignments', 'route_id', $id);
-        $result = $this->supabaseDelete('transport_routes', 'id', $id);
-        $result ? Response::json(['success' => true, 'message' => 'Route deleted.'], 200)
-                : Response::json(['success' => false, 'error' => 'Failed to delete route.'], 500);
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
+
+        $id = $this->input('id', '');
+        if (empty($id)) {
+            $this->error('Route ID is required.', 422);
+            return;
+        }
+
+        try {
+            $assignments = $this->db->select('transport_assignments', ['route_id' => ['eq' => $id]]);
+            foreach ($assignments as $a) {
+                $this->db->deleteById('transport_assignments', $a['id']);
+            }
+            $this->db->deleteById('transport_routes', $id);
+            $this->success(null, 'Route deleted.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to delete route: ' . $e->getMessage(), 500);
+        }
     }
+
+    // ─────────────────────────────────────────────────────────
+    //  API Routes - Vehicles
+    // ─────────────────────────────────────────────────────────
 
     public function apiVehicles(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
-        Response::json(['success' => true, 'data' => $this->fetchVehicles($this->auth->user())], 200);
+        $this->requireAuth();
+        $this->success($this->fetchVehicles());
     }
 
     public function apiStoreVehicle(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        $input = $this->request->jsonBody();
-        $user  = $this->auth->user();
-
+        $input = $this->requestJson();
         $errors = $this->validateVehicle($input);
-        if (!empty($errors)) { Response::json(['success' => false, 'error' => 'Validation failed.', 'errors' => $errors], 422); return; }
+        if (!empty($errors)) {
+            $this->error('Validation failed.', 422, $errors);
+            return;
+        }
 
-        $data = [
-            'school_id'         => $user['school_id'] ?? 1,
-            'registration_number' => $input['registration_number'],
-            'type'              => $input['type'] ?? 'bus',
-            'capacity'          => (int) ($input['capacity'] ?? 40),
-            'driver_name'       => $input['driver_name'] ?? '',
-            'driver_phone'      => $input['driver_phone'] ?? '',
-            'status'            => $input['status'] ?? 'active',
-        ];
+        try {
+            $data = [
+                'registration_number' => $input['registration_number'],
+                'type'              => $input['type'] ?? 'bus',
+                'capacity'          => (int) ($input['capacity'] ?? 40),
+                'driver_name'       => $input['driver_name'] ?? '',
+                'driver_phone'      => $input['driver_phone'] ?? '',
+                'status'            => $input['status'] ?? 'active',
+            ];
 
-        $result = $this->supabaseInsert('transport_vehicles', $data);
-        $result ? Response::json(['success' => true, 'data' => $result, 'message' => 'Vehicle added.'], 201)
-                : Response::json(['success' => false, 'error' => 'Failed to add vehicle.'], 500);
+            $result = $this->db->insert('transport_vehicles', $data);
+            $this->success($result, 'Vehicle added.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to add vehicle: ' . $e->getMessage(), 500);
+        }
     }
 
     public function apiUpdateVehicle(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
 
-        $input = $this->request->jsonBody();
-        $id    = $input['id'] ?? '';
-        if (empty($id)) { Response::json(['success' => false, 'error' => 'Vehicle ID is required.'], 422); return; }
+        $input = $this->requestJson();
+        $id = $input['id'] ?? '';
+        if (empty($id)) {
+            $this->error('Vehicle ID is required.', 422);
+            return;
+        }
 
-        $data = array_filter([
-            'registration_number' => $input['registration_number'] ?? null,
-            'type'      => $input['type'] ?? null,
-            'capacity'  => isset($input['capacity']) ? (int) $input['capacity'] : null,
-            'driver_name'=> $input['driver_name'] ?? null,
-            'driver_phone' => $input['driver_phone'] ?? null,
-            'status'    => $input['status'] ?? null,
-        ], fn($v) => $v !== null);
+        try {
+            $data = array_filter([
+                'registration_number' => $input['registration_number'] ?? null,
+                'type'      => $input['type'] ?? null,
+                'capacity'  => isset($input['capacity']) ? (int) $input['capacity'] : null,
+                'driver_name'=> $input['driver_name'] ?? null,
+                'driver_phone' => $input['driver_phone'] ?? null,
+                'status'    => $input['status'] ?? null,
+            ], fn($v) => $v !== null);
 
-        $result = $this->supabaseUpdate('transport_vehicles', $id, $data);
-        $result ? Response::json(['success' => true, 'data' => $result, 'message' => 'Vehicle updated.'], 200)
-                : Response::json(['success' => false, 'error' => 'Failed to update vehicle.'], 500);
+            $result = $this->db->updateById('transport_vehicles', $id, $data);
+            $this->success($result, 'Vehicle updated.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to update vehicle: ' . $e->getMessage(), 500);
+        }
     }
 
     public function apiDestroyVehicle(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
-        $id = $this->request->get('id', '');
-        if (empty($id)) { Response::json(['success' => false, 'error' => 'Vehicle ID is required.'], 422); return; }
-        $result = $this->supabaseDelete('transport_vehicles', 'id', $id);
-        $result ? Response::json(['success' => true, 'message' => 'Vehicle deleted.'], 200)
-                : Response::json(['success' => false, 'error' => 'Failed to delete vehicle.'], 500);
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
+
+        $id = $this->input('id', '');
+        if (empty($id)) {
+            $this->error('Vehicle ID is required.', 422);
+            return;
+        }
+
+        try {
+            $this->db->deleteById('transport_vehicles', $id);
+            $this->success(null, 'Vehicle deleted.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to delete vehicle: ' . $e->getMessage(), 500);
+        }
     }
+
+    // ─────────────────────────────────────────────────────────
+    //  API Routes - Assignments
+    // ─────────────────────────────────────────────────────────
 
     public function apiAssignStudent(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
+        $this->requireAuth();
 
-        $input = $this->request->jsonBody();
+        $input = $this->requestJson();
         if (empty($input['student_id']) || empty($input['route_id'])) {
-            Response::json(['success' => false, 'error' => 'Student and route are required.'], 422); return;
+            $this->error('Student and route are required.', 422);
+            return;
         }
 
-        $data = [
-            'student_id'   => $input['student_id'],
-            'route_id'     => $input['route_id'],
-            'pickup_point' => $input['pickup_point'] ?? '',
-            'drop_point'   => $input['drop_point'] ?? '',
-        ];
+        try {
+            $data = [
+                'student_id'   => $input['student_id'],
+                'route_id'     => $input['route_id'],
+                'pickup_point' => $input['pickup_point'] ?? '',
+                'drop_point'   => $input['drop_point'] ?? '',
+            ];
 
-        $result = $this->supabaseInsert('transport_assignments', $data);
-        $result ? Response::json(['success' => true, 'data' => $result, 'message' => 'Student assigned to route.'], 201)
-                : Response::json(['success' => false, 'error' => 'Failed to assign student.'], 500);
+            $result = $this->db->insert('transport_assignments', $data);
+            $this->success($result, 'Student assigned to route.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to assign student: ' . $e->getMessage(), 500);
+        }
     }
 
     public function apiRemoveAssignment(): void
     {
-        Response::jsonHeaders();
-        if (!$this->auth->check()) { Response::json(['success' => false, 'error' => 'Not authenticated.'], 401); return; }
-        $id = $this->request->get('id', '');
-        if (empty($id)) { Response::json(['success' => false, 'error' => 'Assignment ID is required.'], 422); return; }
-        $result = $this->supabaseDelete('transport_assignments', 'id', $id);
-        $result ? Response::json(['success' => true, 'message' => 'Assignment removed.'], 200)
-                : Response::json(['success' => false, 'error' => 'Failed to remove assignment.'], 500);
+        $this->requireAuth();
+
+        $id = $this->input('id', '');
+        if (empty($id)) {
+            $this->error('Assignment ID is required.', 422);
+            return;
+        }
+
+        try {
+            $this->db->deleteById('transport_assignments', $id);
+            $this->success(null, 'Assignment removed.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to remove assignment: ' . $e->getMessage(), 500);
+        }
     }
 
     // ─────────────────────────────────────────────────────────
-    //  Private Data Fetching
+    //  Data Fetching
     // ─────────────────────────────────────────────────────────
 
-    private function fetchRoutes(array $user): array
+    private function fetchRoutes(): array
     {
-        $data = $this->supabaseFetch('transport_routes?select=*&order=name');
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'name' => 'Westlands Route', 'description' => 'Via Waiyaki Way to Westlands', 'stops' => ['Kangemi', 'Kabete', 'Westlands'], 'driver_name' => 'John Kamau', 'vehicle_reg' => 'KBA 234J', 'status' => 'active'],
-                ['id' => '2', 'name' => 'Eastlands Route', 'description' => 'Via Jogoo Road to Eastlands', 'stops' => ['Buruburu', 'Umoja', 'Donholm'], 'driver_name' => 'Peter Odhiambo', 'vehicle_reg' => 'KCA 567K', 'status' => 'active'],
-                ['id' => '3', 'name' => 'Karen Route', 'description' => 'Via Ngong Road to Karen', 'stops' => ['Langata', 'Karen', 'Bomas'], 'driver_name' => 'Samuel Kibet', 'vehicle_reg' => 'KDB 890L', 'status' => 'active'],
-                ['id' => '4', 'name' => 'Thika Route', 'description' => 'Via Thika Road', 'stops' => ['Roysambu', 'Githurai', 'Thika'], 'driver_name' => '', 'vehicle_reg' => '', 'status' => 'inactive'],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT tr.*,
+                        tv.registration_number as vehicle_reg,
+                        tv.driver_name as driver_name
+                 FROM transport_routes tr
+                 LEFT JOIN transport_vehicles tv ON tr.vehicle_id = tv.id
+                 ORDER BY tr.name"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-        return $data;
     }
 
-    private function fetchVehicles(array $user): array
+    private function fetchVehicles(): array
     {
-        $data = $this->supabaseFetch('transport_vehicles?select=*&order=registration_number');
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'registration_number' => 'KBA 234J', 'type' => 'bus', 'capacity' => 52, 'driver_name' => 'John Kamau', 'driver_phone' => '0722 123456', 'status' => 'active'],
-                ['id' => '2', 'registration_number' => 'KCA 567K', 'type' => 'bus', 'capacity' => 52, 'driver_name' => 'Peter Odhiambo', 'driver_phone' => '0733 654321', 'status' => 'active'],
-                ['id' => '3', 'registration_number' => 'KDB 890L', 'type' => 'van', 'capacity' => 16, 'driver_name' => 'Samuel Kibet', 'driver_phone' => '0711 987654', 'status' => 'active'],
-                ['id' => '4', 'registration_number' => 'KEC 123M', 'type' => 'van', 'capacity' => 16, 'driver_name' => 'David Mutua', 'driver_phone' => '0700 111222', 'status' => 'maintenance'],
-            ];
+        try {
+            return $this->db->select('transport_vehicles', [], 'registration_number.asc');
+        } catch (\RuntimeException $e) {
+            return [];
         }
-        return $data;
     }
 
-    private function fetchAssignments(array $user): array
+    private function fetchAssignments(): array
     {
-        $data = $this->supabaseFetch('transport_assignments?select=*,student:students(first_name,last_name,admission_number),route:transport_routes(name)&order=created_at.desc');
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'student_id' => '1', 'route_id' => '1', 'student' => ['first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'], 'route' => ['name' => 'Westlands Route'], 'pickup_point' => 'Kangemi Stage', 'drop_point' => 'Westlands Stage'],
-                ['id' => '2', 'student_id' => '2', 'route_id' => '2', 'student' => ['first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'], 'route' => ['name' => 'Eastlands Route'], 'pickup_point' => 'Umoja Stage', 'drop_point' => 'Donholm Stage'],
-                ['id' => '3', 'student_id' => '3', 'route_id' => '3', 'student' => ['first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'], 'route' => ['name' => 'Karen Route'], 'pickup_point' => 'Langata Stage', 'drop_point' => 'Karen Stage'],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT ta.*,
+                        u.first_name as student_first_name, u.last_name as student_last_name,
+                        sp.admission_no as student_admission_no,
+                        tr.name as route_name
+                 FROM transport_assignments ta
+                 LEFT JOIN users u ON ta.student_id = u.id
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 LEFT JOIN transport_routes tr ON ta.route_id = tr.id
+                 ORDER BY ta.created_at DESC"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-        return $data;
     }
 
-    private function fetchStudents(array $user): array
+    private function fetchStudents(): array
     {
-        $students = $this->supabaseFetch('users?select=id,first_name,last_name,admission_number&role=eq.Student&order=first_name');
-        if (empty($students)) {
-            return [
-                ['id' => '1', 'first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'],
-                ['id' => '2', 'first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'],
-                ['id' => '3', 'first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT u.id, u.first_name, u.last_name, sp.admission_no
+                 FROM users u
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 WHERE u.user_type = 'student'
+                 ORDER BY u.first_name"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-        return $students;
     }
 
-    private function fetchTransportStats(array $user): array
+    private function fetchTransportStats(): array
     {
-        return ['total_routes' => 8, 'total_vehicles' => 6, 'assigned_students' => 120, 'active_routes' => 6];
+        try {
+            $routes = $this->db->raw("SELECT COUNT(*) as cnt FROM transport_routes");
+            $vehicles = $this->db->raw("SELECT COUNT(*) as cnt FROM transport_vehicles");
+            $assigned = $this->db->raw("SELECT COUNT(*) as cnt FROM transport_assignments");
+            $active = $this->db->raw("SELECT COUNT(*) as cnt FROM transport_routes WHERE status = 'active'");
+
+            return [
+                'total_routes'    => (int) ($routes[0]['cnt'] ?? 0),
+                'total_vehicles'  => (int) ($vehicles[0]['cnt'] ?? 0),
+                'assigned_students'=> (int) ($assigned[0]['cnt'] ?? 0),
+                'active_routes'   => (int) ($active[0]['cnt'] ?? 0),
+            ];
+        } catch (\RuntimeException $e) {
+            return ['total_routes' => 0, 'total_vehicles' => 0, 'assigned_students' => 0, 'active_routes' => 0];
+        }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -329,48 +362,60 @@ class TransportController
         return $errors;
     }
 
+    private function requestJson(): array
+    {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
     // ─────────────────────────────────────────────────────────
-    //  Supabase Helpers
+    //  Web Route Stubs
     // ─────────────────────────────────────────────────────────
 
-    private function supabaseFetch(string $query): ?array
+    public function routes(): void { $this->index(); }
+    public function createRoute(): void { $this->index(); }
+    public function storeRoute(): void { $this->redirect('/transport'); }
+    public function vehicles(): void { $this->index(); }
+    public function createVehicle(): void { $this->index(); }
+    public function storeVehicle(): void { $this->redirect('/transport'); }
+    public function assignments(): void { $this->index(); }
+
+    // ─────────────────────────────────────────────────────────
+    //  Missing API Route Stubs
+    // ─────────────────────────────────────────────────────────
+
+    public function apiShowRoute(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$query}&apikey=" . urlencode($this->supabaseKey);
-        $ctx = stream_context_create(['http' => ['method' => 'GET', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n", 'timeout' => 10, 'ignore_errors' => true]]);
-        $r = @file_get_contents($url, false, $ctx);
-        return $r === false ? null : json_decode($r, true);
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $this->success($this->db->find('transport_routes', $id));
     }
 
-    private function supabaseInsert(string $table, array $data): ?array
+    public function apiDeleteRoute(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}";
-        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation", 'content' => json_encode($data), 'timeout' => 10, 'ignore_errors' => true]]);
-        $r = @file_get_contents($url, false, $ctx);
-        if ($r === false) return null;
-        $res = json_decode($r, true);
-        return is_array($res) && !empty($res) ? $res[0] : null;
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
+        $id = $this->input('id', '');
+        if (empty($id)) { $this->error('Route ID is required.', 422); return; }
+        $this->db->deleteById('transport_routes', $id);
+        $this->success(null, 'Route deleted.');
     }
 
-    private function supabaseUpdate(string $table, string $id, array $data): ?array
+    public function apiShowVehicle(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?id=eq.{$id}";
-        $ctx = stream_context_create(['http' => ['method' => 'PATCH', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation", 'content' => json_encode($data), 'timeout' => 10, 'ignore_errors' => true]]);
-        $r = @file_get_contents($url, false, $ctx);
-        if ($r === false) return null;
-        $res = json_decode($r, true);
-        return is_array($res) && !empty($res) ? $res[0] : null;
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $this->success($this->db->find('transport_vehicles', $id));
     }
 
-    private function supabaseDelete(string $table, string $column, string $value): bool
+    public function apiDeleteVehicle(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?{$column}=eq.{$value}";
-        $ctx = stream_context_create(['http' => ['method' => 'DELETE', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n", 'timeout' => 10, 'ignore_errors' => true]]);
-        return @file_get_contents($url, false, $ctx) !== false;
-    }
-
-    private function redirect(string $url): void
-    {
-        header('Location: ' . $url);
-        exit;
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
+        $id = $this->input('id', '');
+        if (empty($id)) { $this->error('Vehicle ID is required.', 422); return; }
+        $this->db->deleteById('transport_vehicles', $id);
+        $this->success(null, 'Vehicle deleted.');
     }
 }

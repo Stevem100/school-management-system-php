@@ -1,345 +1,270 @@
 <?php
 
-namespace App\Controllers;
+declare(strict_types=1);
 
-use App\Core\Auth;
-use App\Core\Request;
-use App\Core\Session;
-use App\Core\Response;
-use App\Core\CSRF;
-use App\Core\View;
+namespace App\Controllers;
 
 /**
  * LibraryController
  *
  * Manages library books, inventory, and student borrowals.
- * Supports CRUD for library_books and borrowals tables.
+ * Uses MySQL database for all CRUD operations.
  */
-class LibraryController
+class LibraryController extends Controller
 {
-    private $auth;
-    private $session;
-    private $request;
-    private $csrf;
-    private $view;
-    private $supabaseUrl;
-    private $supabaseKey;
-
-    public function __construct()
-    {
-        $this->auth    = new Auth();
-        $this->session = new Session();
-        $this->request = new Request();
-        $this->csrf    = new CSRF();
-        $this->view    = new View();
-
-        $this->supabaseUrl = getenv('SUPABASE_URL') ?: 'https://example.supabase.co';
-        $this->supabaseKey = getenv('SUPABASE_ANON_KEY') ?: '';
-    }
-
-    // ─────────────────────────────────────────────────────────
-    //  Web Routes
-    // ─────────────────────────────────────────────────────────
-
+    /**
+     * Library index page.
+     */
     public function index(): void
     {
-        if (!$this->auth->check()) {
-            $this->session->flash('error', 'Please log in to access this page.');
-            $this->redirect('/login');
-            return;
-        }
+        $this->requireAuth();
 
-        $user = $this->auth->user();
+        $books     = $this->fetchBooks();
+        $borrowals = $this->fetchBorrowals();
+        $students  = $this->fetchStudents();
+        $stats     = $this->fetchLibraryStats();
 
-        $books     = $this->fetchBooks($user);
-        $borrowals = $this->fetchBorrowals($user);
-        $students  = $this->fetchStudents($user);
-        $stats     = $this->fetchLibraryStats($user);
-
-        $flashSuccess = $this->session->getFlash('success');
-        $flashError   = $this->session->getFlash('error');
-
-        $this->view->renderWithLayout('library/index', 'layouts/app', [
+        $this->renderWithLayout('library/index', [
             'pageTitle'    => 'Library',
-            'user'         => $user,
             'currentPage'  => 'library',
             'books'        => $books,
             'borrowals'    => $borrowals,
             'students'     => $students,
             'stats'        => $stats,
-            'flashSuccess' => $flashSuccess,
-            'flashError'   => $flashError,
         ]);
     }
 
     // ─────────────────────────────────────────────────────────
-    //  API Routes (JSON responses)
+    //  API Routes
     // ─────────────────────────────────────────────────────────
 
     public function apiIndex(): void
     {
-        Response::jsonHeaders();
-
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $user = $this->auth->user();
-        $books = $this->fetchBooks($user);
-
-        Response::json(['success' => true, 'data' => $books], 200);
+        $this->requireAuth();
+        $this->success($this->fetchBooks());
     }
 
     public function apiStore(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Librarian']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $user  = $this->auth->user();
-
+        $input = $this->requestJson();
         $errors = $this->validateBook($input);
         if (!empty($errors)) {
-            Response::json(['success' => false, 'error' => 'Validation failed.', 'errors' => $errors], 422);
+            $this->error('Validation failed.', 422, $errors);
             return;
         }
 
-        $data = [
-            'school_id'       => $user['school_id'] ?? 1,
-            'isbn'            => $input['isbn'] ?? '',
-            'title'           => $input['title'],
-            'author'          => $input['author'],
-            'publisher'       => $input['publisher'] ?? '',
-            'category'        => $input['category'] ?? 'General',
-            'total_copies'    => (int) ($input['total_copies'] ?? 1),
-            'available_copies'=> (int) ($input['total_copies'] ?? 1),
-            'shelf_location'  => $input['shelf_location'] ?? '',
-            'status'          => $input['status'] ?? 'available',
-        ];
+        try {
+            $data = [
+                'isbn'             => $input['isbn'] ?? '',
+                'title'            => $input['title'],
+                'author'           => $input['author'],
+                'publisher'        => $input['publisher'] ?? '',
+                'category'         => $input['category'] ?? 'General',
+                'total_copies'     => (int) ($input['total_copies'] ?? 1),
+                'available_copies' => (int) ($input['total_copies'] ?? 1),
+                'shelf_location'   => $input['shelf_location'] ?? '',
+                'status'           => $input['status'] ?? 'available',
+            ];
 
-        $result = $this->supabaseInsert('library_books', $data);
-
-        if ($result) {
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Book added successfully.'], 201);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to add book.'], 500);
+            $result = $this->db->insert('library_books', $data);
+            $this->success($result, 'Book added successfully.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to add book: ' . $e->getMessage(), 500);
         }
     }
 
     public function apiUpdate(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Librarian']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $id    = $input['id'] ?? '';
+        $input = $this->requestJson();
+        $id = $input['id'] ?? '';
 
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Book ID is required.'], 422);
+            $this->error('Book ID is required.', 422);
             return;
         }
 
-        $data = array_filter([
-            'isbn'           => $input['isbn'] ?? null,
-            'title'          => $input['title'] ?? null,
-            'author'         => $input['author'] ?? null,
-            'publisher'      => $input['publisher'] ?? null,
-            'category'       => $input['category'] ?? null,
-            'total_copies'   => isset($input['total_copies']) ? (int) $input['total_copies'] : null,
-            'shelf_location' => $input['shelf_location'] ?? null,
-            'status'         => $input['status'] ?? null,
-        ], fn($v) => $v !== null);
+        try {
+            $data = array_filter([
+                'isbn'           => $input['isbn'] ?? null,
+                'title'          => $input['title'] ?? null,
+                'author'         => $input['author'] ?? null,
+                'publisher'      => $input['publisher'] ?? null,
+                'category'       => $input['category'] ?? null,
+                'total_copies'   => isset($input['total_copies']) ? (int) $input['total_copies'] : null,
+                'shelf_location' => $input['shelf_location'] ?? null,
+                'status'         => $input['status'] ?? null,
+            ], fn($v) => $v !== null);
 
-        $result = $this->supabaseUpdate('library_books', $id, $data);
-
-        if ($result) {
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Book updated successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to update book.'], 500);
+            $result = $this->db->updateById('library_books', $id, $data);
+            $this->success($result, 'Book updated successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to update book: ' . $e->getMessage(), 500);
         }
     }
 
     public function apiDestroy(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $id = $this->request->get('id', '');
-
+        $id = $this->input('id', '');
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Book ID is required.'], 422);
+            $this->error('Book ID is required.', 422);
             return;
         }
 
-        $result = $this->supabaseDelete('library_books', 'id', $id);
-
-        if ($result) {
-            Response::json(['success' => true, 'message' => 'Book deleted successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to delete book.'], 500);
+        try {
+            $this->db->deleteById('library_books', $id);
+            $this->success(null, 'Book deleted successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to delete book: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Record a book borrowal.
-     * POST /api/library/borrow
-     */
     public function apiBorrow(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-
+        $input = $this->requestJson();
         if (empty($input['book_id']) || empty($input['student_id'])) {
-            Response::json(['success' => false, 'error' => 'Book and student are required.'], 422);
+            $this->error('Book and student are required.', 422);
             return;
         }
 
-        $data = [
-            'book_id'       => $input['book_id'],
-            'student_id'    => $input['student_id'],
-            'borrowed_date' => date('Y-m-d'),
-            'due_date'      => $input['due_date'] ?? date('Y-m-d', strtotime('+14 days')),
-            'status'        => 'borrowed',
-            'fine'          => 0,
-        ];
+        try {
+            $data = [
+                'book_id'       => $input['book_id'],
+                'student_id'    => $input['student_id'],
+                'borrowed_date' => date('Y-m-d'),
+                'due_date'      => $input['due_date'] ?? date('Y-m-d', strtotime('+14 days')),
+                'status'        => 'borrowed',
+                'fine'          => 0,
+            ];
 
-        $result = $this->supabaseInsert('borrowals', $data);
+            $result = $this->db->insert('borrowals', $data);
 
-        if ($result) {
             // Decrement available copies
-            $book = $this->supabaseFetch("library_books?select=available_copies&id=eq.{$input['book_id']}");
-            if (!empty($book) && !empty($book[0])) {
-                $newAvailable = max(0, (int) $book[0]['available_copies'] - 1);
-                $this->supabaseUpdate('library_books', $input['book_id'], ['available_copies' => $newAvailable]);
+            $book = $this->db->find('library_books', $input['book_id']);
+            if ($book) {
+                $newAvailable = max(0, (int) ($book['available_copies'] ?? 0) - 1);
+                $this->db->updateById('library_books', $input['book_id'], ['available_copies' => $newAvailable]);
             }
 
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Book borrowed successfully.'], 201);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to record borrowal.'], 500);
+            $this->success($result, 'Book borrowed successfully.', 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to record borrowal: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Return a borrowed book.
-     * POST /api/library/return
-     */
     public function apiReturn(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $id    = $input['borrowal_id'] ?? '';
+        $input = $this->requestJson();
+        $id = $input['borrowal_id'] ?? '';
 
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Borrowal ID is required.'], 422);
+            $this->error('Borrowal ID is required.', 422);
             return;
         }
 
-        $result = $this->supabaseUpdate('borrowals', $id, [
-            'returned_date' => date('Y-m-d'),
-            'status'        => 'returned',
-        ]);
+        try {
+            $borrowal = $this->db->find('borrowals', $id);
+            if (!$borrowal) {
+                $this->error('Borrowal record not found.', 404);
+                return;
+            }
 
-        if ($result) {
+            $this->db->updateById('borrowals', $id, [
+                'returned_date' => date('Y-m-d'),
+                'status'        => 'returned',
+            ]);
+
             // Increment available copies
-            $bookId = $result['book_id'] ?? '';
-            if (!empty($bookId)) {
-                $book = $this->supabaseFetch("library_books?select=available_copies,total_copies&id=eq.{$bookId}");
-                if (!empty($book) && !empty($book[0])) {
-                    $newAvailable = min((int) $book[0]['total_copies'], (int) $book[0]['available_copies'] + 1);
-                    $this->supabaseUpdate('library_books', $bookId, ['available_copies' => $newAvailable]);
+            if (!empty($borrowal['book_id'])) {
+                $book = $this->db->find('library_books', $borrowal['book_id']);
+                if ($book) {
+                    $newAvailable = min((int) ($book['total_copies'] ?? 0), (int) ($book['available_copies'] ?? 0) + 1);
+                    $this->db->updateById('library_books', $borrowal['book_id'], ['available_copies' => $newAvailable]);
                 }
             }
 
-            Response::json(['success' => true, 'message' => 'Book returned successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to return book.'], 500);
+            $this->success(null, 'Book returned successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to return book: ' . $e->getMessage(), 500);
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    //  Private Data Fetching
+    //  Data Fetching
     // ─────────────────────────────────────────────────────────
 
-    private function fetchBooks(array $user): array
+    private function fetchBooks(): array
     {
-        $data = $this->supabaseFetch('library_books?select=*&order=title');
-
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'isbn' => '978-0134685991', 'title' => 'Mathematics Form 1', 'author' => 'K. Muchiri', 'publisher' => 'Kenya Literature Bureau', 'category' => 'Mathematics', 'total_copies' => 30, 'available_copies' => 22, 'shelf_location' => 'A1-03', 'status' => 'available'],
-                ['id' => '2', 'isbn' => '978-0134685992', 'title' => 'English Grammar in Use', 'author' => 'R. Murphy', 'publisher' => 'Cambridge Press', 'category' => 'English', 'total_copies' => 25, 'available_copies' => 18, 'shelf_location' => 'B2-05', 'status' => 'available'],
-                ['id' => '3', 'isbn' => '978-0134685993', 'title' => 'Biology for Schools', 'author' => 'D. Mackean', 'publisher' => 'Oxford Press', 'category' => 'Sciences', 'total_copies' => 20, 'available_copies' => 20, 'shelf_location' => 'C1-12', 'status' => 'available'],
-                ['id' => '4', 'isbn' => '978-0134685994', 'title' => 'Kiswahili Sanifu', 'author' => 'J. Mochi', 'publisher' => 'Longhorn Publishers', 'category' => 'Languages', 'total_copies' => 15, 'available_copies' => 5, 'shelf_location' => 'D3-08', 'status' => 'available'],
-                ['id' => '5', 'isbn' => '978-0134685995', 'title' => 'Physics: Principles with Applications', 'author' => 'D. Giancoli', 'publisher' => 'Pearson', 'category' => 'Sciences', 'total_copies' => 18, 'available_copies' => 10, 'shelf_location' => 'C2-04', 'status' => 'available'],
-                ['id' => '6', 'isbn' => '978-0134685996', 'title' => 'History of Kenya', 'author' => 'W. Ochieng', 'publisher' => 'East African Publishers', 'category' => 'Humanities', 'total_copies' => 12, 'available_copies' => 0, 'shelf_location' => 'E1-01', 'status' => 'unavailable'],
-            ];
+        try {
+            return $this->db->select('library_books', [], 'title.asc');
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $data;
     }
 
-    private function fetchBorrowals(array $user): array
+    private function fetchBorrowals(): array
     {
-        $data = $this->supabaseFetch('borrowals?select=*,book:library_books(title,author),student:students(first_name,last_name,admission_number)&order=borrowed_date.desc');
-
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'book_id' => '1', 'student_id' => '1', 'book' => ['title' => 'Mathematics Form 1', 'author' => 'K. Muchiri'], 'student' => ['first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'], 'borrowed_date' => '2024-11-10', 'due_date' => '2024-11-24', 'returned_date' => null, 'status' => 'overdue', 'fine' => 100],
-                ['id' => '2', 'book_id' => '2', 'student_id' => '2', 'book' => ['title' => 'English Grammar in Use', 'author' => 'R. Murphy'], 'student' => ['first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'], 'borrowed_date' => '2024-11-20', 'due_date' => '2024-12-04', 'returned_date' => null, 'status' => 'borrowed', 'fine' => 0],
-                ['id' => '3', 'book_id' => '4', 'student_id' => '3', 'book' => ['title' => 'Kiswahili Sanifu', 'author' => 'J. Mochi'], 'student' => ['first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'], 'borrowed_date' => '2024-11-01', 'due_date' => '2024-11-15', 'returned_date' => '2024-11-14', 'status' => 'returned', 'fine' => 0],
-                ['id' => '4', 'book_id' => '5', 'student_id' => '4', 'book' => ['title' => 'Physics: Principles', 'author' => 'D. Giancoli'], 'student' => ['first_name' => 'James', 'last_name' => 'Ochieng', 'admission_number' => 'ADM/2024/004'], 'borrowed_date' => '2024-11-18', 'due_date' => '2024-12-02', 'returned_date' => null, 'status' => 'borrowed', 'fine' => 0],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT b.*,
+                        lb.title as book_title, lb.author as book_author,
+                        u.first_name as student_first_name, u.last_name as student_last_name,
+                        sp.admission_no as student_admission_no
+                 FROM borrowals b
+                 LEFT JOIN library_books lb ON b.book_id = lb.id
+                 LEFT JOIN users u ON b.student_id = u.id
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 ORDER BY b.borrowed_date DESC"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $data;
     }
 
-    private function fetchStudents(array $user): array
+    private function fetchStudents(): array
     {
-        $students = $this->supabaseFetch('users?select=id,first_name,last_name,admission_number&role=eq.Student&order=first_name');
-        if (empty($students)) {
-            return [
-                ['id' => '1', 'first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'],
-                ['id' => '2', 'first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'],
-                ['id' => '3', 'first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT u.id, u.first_name, u.last_name, sp.admission_no
+                 FROM users u
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 WHERE u.user_type = 'student'
+                 ORDER BY u.first_name"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-        return $students;
     }
 
-    private function fetchLibraryStats(array $user): array
+    private function fetchLibraryStats(): array
     {
-        return [
-            'total_books'     => 1240,
-            'available_books' => 890,
-            'borrowed_books'  => 310,
-            'overdue_books'   => 24,
-        ];
+        try {
+            $total = $this->db->raw("SELECT COALESCE(SUM(total_copies), 0) as cnt FROM library_books");
+            $available = $this->db->raw("SELECT COALESCE(SUM(available_copies), 0) as cnt FROM library_books");
+            $borrowed = $this->db->raw("SELECT COUNT(*) as cnt FROM borrowals WHERE status = 'borrowed'");
+            $overdue = $this->db->raw("SELECT COUNT(*) as cnt FROM borrowals WHERE status = 'overdue' OR due_date < CURDATE()");
+
+            return [
+                'total_books'     => (int) ($total[0]['cnt'] ?? 0),
+                'available_books' => (int) ($available[0]['cnt'] ?? 0),
+                'borrowed_books'  => (int) ($borrowed[0]['cnt'] ?? 0),
+                'overdue_books'   => (int) ($overdue[0]['cnt'] ?? 0),
+            ];
+        } catch (\RuntimeException $e) {
+            return ['total_books' => 0, 'available_books' => 0, 'borrowed_books' => 0, 'overdue_books' => 0];
+        }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -357,49 +282,47 @@ class LibraryController
         return $errors;
     }
 
+    private function requestJson(): array
+    {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
     // ─────────────────────────────────────────────────────────
-    //  Supabase Helpers
+    //  Web Route Stubs
     // ─────────────────────────────────────────────────────────
 
-    private function supabaseFetch(string $query): ?array
-    {
-        $url  = "{$this->supabaseUrl}/rest/v1/{$query}";
-        $url .= '&apikey=' . urlencode($this->supabaseKey);
-        $context = stream_context_create(['http' => ['method' => 'GET', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n", 'timeout' => 10, 'ignore_errors' => true]]);
-        $response = @file_get_contents($url, false, $context);
-        return $response === false ? null : json_decode($response, true);
-    }
+    public function books(): void { $this->index(); }
+    public function createBook(): void { $this->index(); }
+    public function storeBook(): void { $this->redirect('/library'); }
+    public function showBook(string $id): void { $this->index(); }
+    public function editBook(string $id): void { $this->index(); }
+    public function updateBook(string $id): void { $this->redirect('/library'); }
+    public function deleteBook(string $id): void { $this->redirect('/library'); }
+    public function issue(): void { $this->index(); }
+    public function storeIssue(): void { $this->redirect('/library'); }
+    public function returns(): void { $this->index(); }
 
-    private function supabaseInsert(string $table, array $data): ?array
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}";
-        $context = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation", 'content' => json_encode($data), 'timeout' => 10, 'ignore_errors' => true]]);
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) return null;
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
-    }
+    // ─────────────────────────────────────────────────────────
+    //  API Route Stubs (renamed methods from routes)
+    // ─────────────────────────────────────────────────────────
 
-    private function supabaseUpdate(string $table, string $id, array $data): ?array
+    public function apiBooks(): void { $this->apiIndex(); }
+    public function apiStoreBook(): void { $this->apiStore(); }
+    public function apiShowBook(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?id=eq.{$id}";
-        $context = stream_context_create(['http' => ['method' => 'PATCH', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation", 'content' => json_encode($data), 'timeout' => 10, 'ignore_errors' => true]]);
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) return null;
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $this->success($this->db->find('library_books', $id));
     }
-
-    private function supabaseDelete(string $table, string $column, string $value): bool
+    public function apiUpdateBook(): void { $this->apiUpdate(); }
+    public function apiDeleteBook(): void { $this->apiDestroy(); }
+    public function apiIssues(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?{$column}=eq.{$value}";
-        $context = stream_context_create(['http' => ['method' => 'DELETE', 'header' => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n", 'timeout' => 10, 'ignore_errors' => true]]);
-        return @file_get_contents($url, false, $context) !== false;
+        $this->requireAuth();
+        $this->success($this->fetchBorrowals());
     }
-
-    private function redirect(string $url): void
-    {
-        header('Location: ' . $url);
-        exit;
-    }
+    public function apiStoreIssue(): void { $this->apiBorrow(); }
+    public function apiReturnBook(string $id): void { $this->apiReturn(); }
 }

@@ -1,100 +1,37 @@
 <?php
 
-namespace App\Controllers;
+declare(strict_types=1);
 
-use App\Core\Auth;
-use App\Core\Request;
-use App\Core\Session;
-use App\Core\Response;
-use App\Core\CSRF;
-use App\Core\View;
+namespace App\Controllers;
 
 /**
  * PaymentController
  *
  * Manages student fee payments, receipt generation, and payment records.
  * Supports multiple payment methods: cash, M-Pesa, bank transfer, cheque.
+ * Uses MySQL database for all operations.
  */
-class PaymentController
+class PaymentController extends Controller
 {
-    /**
-     * @var Auth
-     */
-    private $auth;
-
-    /**
-     * @var Session
-     */
-    private $session;
-
-    /**
-     * @var Request
-     */
-    private $request;
-
-    /**
-     * @var CSRF
-     */
-    private $csrf;
-
-    /**
-     * @var View
-     */
-    private $view;
-
-    /**
-     * Supabase API configuration
-     */
-    private $supabaseUrl;
-    private $supabaseKey;
-
-    public function __construct()
-    {
-        $this->auth    = new Auth();
-        $this->session = new Session();
-        $this->request = new Request();
-        $this->csrf    = new CSRF();
-        $this->view    = new View();
-
-        $this->supabaseUrl = getenv('SUPABASE_URL') ?: 'https://example.supabase.co';
-        $this->supabaseKey = getenv('SUPABASE_ANON_KEY') ?: '';
-    }
-
-    // ─────────────────────────────────────────────────────────
-    //  Web Routes
-    // ─────────────────────────────────────────────────────────
-
     /**
      * Payments index page.
      */
     public function index(): void
     {
-        if (!$this->auth->check()) {
-            $this->session->flash('error', 'Please log in to access this page.');
-            $this->redirect('/login');
-            return;
-        }
+        $this->requireAuth();
 
-        $user = $this->auth->user();
+        $payments = $this->fetchPayments();
+        $students = $this->fetchStudents();
+        $feeStructures = $this->fetchFeeStructures();
+        $stats = $this->fetchPaymentStats();
 
-        $payments = $this->fetchPayments($user);
-        $students = $this->fetchStudents($user);
-        $feeStructures = $this->fetchFeeStructures($user);
-        $stats = $this->fetchPaymentStats($user);
-
-        $flashSuccess = $this->session->getFlash('success');
-        $flashError   = $this->session->getFlash('error');
-
-        $this->view->renderWithLayout('payments/index', 'layouts/app', [
-            'pageTitle'      => 'Payments',
-            'user'           => $user,
-            'currentPage'    => 'payments',
-            'payments'       => $payments,
-            'students'       => $students,
-            'feeStructures'  => $feeStructures,
-            'stats'          => $stats,
-            'flashSuccess'   => $flashSuccess,
-            'flashError'     => $flashError,
+        $this->renderWithLayout('payments/index', [
+            'pageTitle'     => 'Payments',
+            'currentPage'   => 'payments',
+            'payments'      => $payments,
+            'students'      => $students,
+            'feeStructures' => $feeStructures,
+            'stats'         => $stats,
         ]);
     }
 
@@ -102,280 +39,160 @@ class PaymentController
     //  API Routes (JSON responses)
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * List all payments as JSON.
-     * GET /api/payments
-     */
     public function apiIndex(): void
     {
-        Response::jsonHeaders();
-
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $user = $this->auth->user();
-        $payments = $this->fetchPayments($user);
-
-        Response::json([
-            'success' => true,
-            'data'    => $payments,
-        ], 200);
+        $this->requireAuth();
+        $this->success($this->fetchPayments());
     }
 
-    /**
-     * Record a new payment.
-     * POST /api/payments
-     */
     public function apiStore(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Accountant']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $user  = $this->auth->user();
-
-        // Validate
+        $input = $this->requestJson();
         $errors = $this->validatePayment($input);
         if (!empty($errors)) {
-            Response::json(['success' => false, 'error' => 'Validation failed.', 'errors' => $errors], 422);
+            $this->error('Validation failed.', 422, $errors);
             return;
         }
 
-        // Generate receipt number
-        $receiptNumber = $this->generateReceiptNumber();
+        try {
+            $receiptNumber = $this->generateReceiptNumber();
 
-        $data = [
-            'student_id'      => $input['student_id'],
-            'fee_structure_id' => $input['fee_structure_id'] ?? null,
-            'amount'          => (float) $input['amount'],
-            'payment_method'  => $input['payment_method'],
-            'transaction_ref' => $input['transaction_ref'] ?? '',
-            'receipt_number'  => $receiptNumber,
-            'status'          => 'completed',
-            'payment_date'    => date('Y-m-d'),
-            'created_by'      => $user['id'] ?? null,
-        ];
+            $data = [
+                'student_id'       => $input['student_id'],
+                'fee_structure_id' => $input['fee_structure_id'] ?? null,
+                'amount'           => (float) $input['amount'],
+                'payment_method'   => $input['payment_method'],
+                'transaction_ref'  => $input['transaction_ref'] ?? '',
+                'receipt_number'   => $receiptNumber,
+                'status'           => 'completed',
+                'payment_date'     => date('Y-m-d'),
+                'created_by'       => $this->currentUserId(),
+            ];
 
-        $result = $this->supabaseInsert('payments', $data);
-
-        if ($result) {
-            Response::json([
-                'success' => true,
-                'data'    => $result,
-                'message' => "Payment recorded successfully. Receipt: {$receiptNumber}",
-            ], 201);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to record payment.'], 500);
+            $result = $this->db->insert('payments', $data);
+            $this->success($result, "Payment recorded successfully. Receipt: {$receiptNumber}", 201);
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to record payment: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Update a payment.
-     * PUT /api/payments/{id}
-     */
     public function apiUpdate(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Accountant']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $input = $this->request->jsonBody();
-        $id    = $input['id'] ?? $this->request->get('id', '');
+        $input = $this->requestJson();
+        $id = $input['id'] ?? '';
 
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Payment ID is required.'], 422);
+            $this->error('Payment ID is required.', 422);
             return;
         }
 
-        $data = array_filter([
-            'amount'          => isset($input['amount']) ? (float) $input['amount'] : null,
-            'payment_method'  => $input['payment_method'] ?? null,
-            'transaction_ref' => $input['transaction_ref'] ?? null,
-            'status'          => $input['status'] ?? null,
-        ], fn($v) => $v !== null);
+        try {
+            $data = array_filter([
+                'amount'          => isset($input['amount']) ? (float) $input['amount'] : null,
+                'payment_method'  => $input['payment_method'] ?? null,
+                'transaction_ref' => $input['transaction_ref'] ?? null,
+                'status'          => $input['status'] ?? null,
+            ], fn($v) => $v !== null);
 
-        $result = $this->supabaseUpdate('payments', $id, $data);
-
-        if ($result) {
-            Response::json(['success' => true, 'data' => $result, 'message' => 'Payment updated successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to update payment.'], 500);
+            $result = $this->db->updateById('payments', $id, $data);
+            $this->success($result, 'Payment updated successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to update payment: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Delete a payment.
-     * DELETE /api/payments/{id}
-     */
     public function apiDestroy(): void
     {
-        Response::jsonHeaders();
+        $this->requireAuth();
+        $this->requireRole(['Super Admin', 'School Admin']);
 
-        if (!$this->auth->check()) {
-            Response::json(['success' => false, 'error' => 'Not authenticated.'], 401);
-            return;
-        }
-
-        $id = $this->request->get('id', '');
-
+        $id = $this->input('id', '');
         if (empty($id)) {
-            Response::json(['success' => false, 'error' => 'Payment ID is required.'], 422);
+            $this->error('Payment ID is required.', 422);
             return;
         }
 
-        $result = $this->supabaseDelete('payments', 'id', $id);
-
-        if ($result) {
-            Response::json(['success' => true, 'message' => 'Payment deleted successfully.'], 200);
-        } else {
-            Response::json(['success' => false, 'error' => 'Failed to delete payment.'], 500);
+        try {
+            $this->db->deleteById('payments', $id);
+            $this->success(null, 'Payment deleted successfully.');
+        } catch (\RuntimeException $e) {
+            $this->error('Failed to delete payment: ' . $e->getMessage(), 500);
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    //  Private Data Fetching Methods
+    //  Data Fetching
     // ─────────────────────────────────────────────────────────
 
-    private function fetchPayments(array $user): array
+    private function fetchPayments(): array
     {
-        $data = $this->supabaseFetch('payments?select=*,student:students(id,first_name,last_name,admission_number)&order=payment_date.desc');
-
-        if (empty($data)) {
-            return [
-                [
-                    'id'              => '1',
-                    'student_id'      => '1',
-                    'student'         => ['first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'],
-                    'fee_structure_id' => '1',
-                    'amount'          => 15000,
-                    'payment_method'  => 'mpesa',
-                    'transaction_ref' => 'SBK3G5Y8X2',
-                    'receipt_number'  => 'RCP-2024-0001',
-                    'status'          => 'completed',
-                    'payment_date'    => '2024-11-28',
-                    'created_at'      => '2024-11-28T10:30:00',
-                ],
-                [
-                    'id'              => '2',
-                    'student_id'      => '2',
-                    'student'         => ['first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'],
-                    'fee_structure_id' => '2',
-                    'amount'          => 25000,
-                    'payment_method'  => 'bank_transfer',
-                    'transaction_ref' => 'BANK-2024-001',
-                    'receipt_number'  => 'RCP-2024-0002',
-                    'status'          => 'completed',
-                    'payment_date'    => '2024-11-27',
-                    'created_at'      => '2024-11-27T14:15:00',
-                ],
-                [
-                    'id'              => '3',
-                    'student_id'      => '3',
-                    'student'         => ['first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'],
-                    'fee_structure_id' => '1',
-                    'amount'          => 10000,
-                    'payment_method'  => 'cash',
-                    'transaction_ref' => '',
-                    'receipt_number'  => 'RCP-2024-0003',
-                    'status'          => 'pending',
-                    'payment_date'    => '2024-11-26',
-                    'created_at'      => '2024-11-26T09:00:00',
-                ],
-                [
-                    'id'              => '4',
-                    'student_id'      => '4',
-                    'student'         => ['first_name' => 'James', 'last_name' => 'Ochieng', 'admission_number' => 'ADM/2024/004'],
-                    'fee_structure_id' => '3',
-                    'amount'          => 20000,
-                    'payment_method'  => 'cheque',
-                    'transaction_ref' => 'CHQ-2024-001',
-                    'receipt_number'  => 'RCP-2024-0004',
-                    'status'          => 'failed',
-                    'payment_date'    => '2024-11-25',
-                    'created_at'      => '2024-11-25T16:45:00',
-                ],
-                [
-                    'id'              => '5',
-                    'student_id'      => '5',
-                    'student'         => ['first_name' => 'Grace', 'last_name' => 'Muthoni', 'admission_number' => 'ADM/2024/005'],
-                    'fee_structure_id' => '2',
-                    'amount'          => 30000,
-                    'payment_method'  => 'mpesa',
-                    'transaction_ref' => 'SBK7H2J9K4',
-                    'receipt_number'  => 'RCP-2024-0005',
-                    'status'          => 'completed',
-                    'payment_date'    => '2024-11-24',
-                    'created_at'      => '2024-11-24T11:20:00',
-                ],
-                [
-                    'id'              => '6',
-                    'student_id'      => '6',
-                    'student'         => ['first_name' => 'Kevin', 'last_name' => 'Otieno', 'admission_number' => 'ADM/2024/006'],
-                    'fee_structure_id' => '1',
-                    'amount'          => 5000,
-                    'payment_method'  => 'cash',
-                    'transaction_ref' => '',
-                    'receipt_number'  => 'RCP-2024-0006',
-                    'status'          => 'refunded',
-                    'payment_date'    => '2024-11-20',
-                    'created_at'      => '2024-11-20T08:30:00',
-                ],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT p.*,
+                        u.first_name as student_first_name, u.last_name as student_last_name,
+                        sp.admission_no as student_admission_no
+                 FROM payments p
+                 LEFT JOIN users u ON p.student_id = u.id
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 ORDER BY p.payment_date DESC"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $data;
     }
 
-    private function fetchStudents(array $user): array
+    private function fetchStudents(): array
     {
-        $students = $this->supabaseFetch('users?select=id,first_name,last_name,admission_number&role=eq.Student&order=first_name');
-
-        if (empty($students)) {
-            return [
-                ['id' => '1', 'first_name' => 'Amina', 'last_name' => 'Hassan', 'admission_number' => 'ADM/2024/001'],
-                ['id' => '2', 'first_name' => 'Brian', 'last_name' => 'Njorge', 'admission_number' => 'ADM/2024/002'],
-                ['id' => '3', 'first_name' => 'Mary', 'last_name' => 'Wanjiku', 'admission_number' => 'ADM/2024/003'],
-                ['id' => '4', 'first_name' => 'James', 'last_name' => 'Ochieng', 'admission_number' => 'ADM/2024/004'],
-                ['id' => '5', 'first_name' => 'Grace', 'last_name' => 'Muthoni', 'admission_number' => 'ADM/2024/005'],
-                ['id' => '6', 'first_name' => 'Kevin', 'last_name' => 'Otieno', 'admission_number' => 'ADM/2024/006'],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT u.id, u.first_name, u.last_name, sp.admission_no
+                 FROM users u
+                 LEFT JOIN student_profiles sp ON u.id = sp.user_id
+                 WHERE u.user_type = 'student'
+                 ORDER BY u.first_name"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $students;
     }
 
-    private function fetchFeeStructures(array $user): array
+    private function fetchFeeStructures(): array
     {
-        $data = $this->supabaseFetch('fee_structures?select=id,class:classes(name),term,academic_year,total_amount&order=created_at.desc');
-
-        if (empty($data)) {
-            return [
-                ['id' => '1', 'class' => ['name' => 'Form 1A'], 'term' => 'Term 1', 'academic_year' => '2024-2025', 'total_amount' => 45000],
-                ['id' => '2', 'class' => ['name' => 'Form 2A'], 'term' => 'Term 1', 'academic_year' => '2024-2025', 'total_amount' => 48000],
-                ['id' => '3', 'class' => ['name' => 'Form 3A'], 'term' => 'Term 1', 'academic_year' => '2024-2025', 'total_amount' => 52000],
-            ];
+        try {
+            return $this->db->raw(
+                "SELECT fs.id, c.name as class_name, fs.term, fs.academic_year, fs.total_amount
+                 FROM fee_structures fs
+                 LEFT JOIN classes c ON fs.class_id = c.id
+                 ORDER BY fs.created_at DESC"
+            );
+        } catch (\RuntimeException $e) {
+            return [];
         }
-
-        return $data;
     }
 
-    private function fetchPaymentStats(array $user): array
+    private function fetchPaymentStats(): array
     {
-        return [
-            'total_collected'   => 1250000,
-            'today_collected'   => 15000,
-            'total_transactions' => 186,
-            'pending_count'     => 12,
-        ];
+        try {
+            $total = $this->db->raw("SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'completed'");
+            $today = $this->db->raw("SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'completed' AND payment_date = CURDATE()");
+            $transactions = $this->db->raw("SELECT COUNT(*) as cnt FROM payments");
+            $pending = $this->db->raw("SELECT COUNT(*) as cnt FROM payments WHERE status = 'pending'");
+
+            return [
+                'total_collected'    => (float) ($total[0]['total'] ?? 0),
+                'today_collected'    => (float) ($today[0]['total'] ?? 0),
+                'total_transactions' => (int) ($transactions[0]['cnt'] ?? 0),
+                'pending_count'      => (int) ($pending[0]['cnt'] ?? 0),
+            ];
+        } catch (\RuntimeException $e) {
+            return ['total_collected' => 0, 'today_collected' => 0, 'total_transactions' => 0, 'pending_count' => 0];
+        }
     }
 
     // ─────────────────────────────────────────────────────────
@@ -415,87 +232,41 @@ class PaymentController
         return "RCP-{$year}-{$random}";
     }
 
+    private function requestJson(): array
+    {
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
     // ─────────────────────────────────────────────────────────
-    //  Supabase Helpers
+    //  Web CRUD Stubs
     // ─────────────────────────────────────────────────────────
 
-    private function supabaseFetch(string $query): ?array
+    public function create(): void { $this->index(); }
+    public function store(): void { $this->redirect('/payments'); }
+    public function show(string $id): void { $this->index(); }
+    public function edit(string $id): void { $this->index(); }
+    public function update(string $id): void { $this->redirect('/payments'); }
+    public function delete(string $id): void { $this->redirect('/payments'); }
+    public function receipt(string $id): void { $this->index(); }
+
+    // Missing API methods
+    public function apiShow(): void
     {
-        $url  = "{$this->supabaseUrl}/rest/v1/{$query}";
-        $url .= '&apikey=' . urlencode($this->supabaseKey);
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'GET',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n",
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-        return $response === false ? null : json_decode($response, true);
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $item = $this->db->find('payments', $id);
+        $this->success($item);
     }
 
-    private function supabaseInsert(string $table, array $data): ?array
+    public function apiDelete(): void { $this->apiDestroy(); }
+
+    public function apiGenerateReceipt(): void
     {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation",
-                'content'       => json_encode($data),
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) return null;
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
-    }
-
-    private function supabaseUpdate(string $table, string $id, array $data): ?array
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?id=eq.{$id}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'PATCH',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\nPrefer: return=representation",
-                'content'       => json_encode($data),
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) return null;
-        $result = json_decode($response, true);
-        return is_array($result) && !empty($result) ? $result[0] : null;
-    }
-
-    private function supabaseDelete(string $table, string $column, string $value): bool
-    {
-        $url = "{$this->supabaseUrl}/rest/v1/{$table}?{$column}=eq.{$value}";
-
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'DELETE',
-                'header'        => "Content-Type: application/json\r\napikey: {$this->supabaseKey}\r\n",
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        return @file_get_contents($url, false, $context) !== false;
-    }
-
-    private function redirect(string $url): void
-    {
-        header('Location: ' . $url);
-        exit;
+        $this->requireAuth();
+        $id = $this->input('id', '');
+        $payment = $this->db->find('payments', $id);
+        $this->success($payment);
     }
 }
