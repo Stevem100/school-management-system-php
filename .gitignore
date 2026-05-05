@@ -1,14 +1,19 @@
-*
-!.gitignore
-!index.php
-!.htaccess
-!.env.example
-!README.md
-!config/
-!core/
-!routes/
-!app/
-!views/
-!public/
-!setup.sql
-!seed-data.sql
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+
+# Logs
+*.log
+
+# Temp
+tmp/
+cache/
