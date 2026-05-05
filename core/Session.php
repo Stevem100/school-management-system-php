@@ -166,11 +166,9 @@ class Session
     public static function flash(string $key, $value): void
     {
         $_SESSION[self::FLASH_PREFIX . $key] = $value;
-
-        // Track this flash key for aging
-        $old = $_SESSION[self::FLASH_OLD_KEY] ?? [];
-        $old[$key] = true;
-        $_SESSION[self::FLASH_OLD_KEY] = $old;
+        // Note: we do NOT mark this as old here.
+        // ageFlashData() will mark it as old on the NEXT request,
+        // so it persists for exactly one subsequent read.
     }
 
     /**
@@ -256,14 +254,21 @@ class Session
      */
     private static function ageFlashData(): void
     {
-        // Remove flashes that were marked as old in the previous request
+        // Step 1: Remove flashes that were marked as old in the previous request
         $old = $_SESSION[self::FLASH_OLD_KEY] ?? [];
         foreach ($old as $key => $_) {
             unset($_SESSION[self::FLASH_PREFIX . $key]);
         }
 
-        // Reset old flash tracking — new flashes become old for next request
+        // Step 2: Mark all CURRENT flash keys as old
+        // (they will be removed on the NEXT request, but are still available NOW)
         $_SESSION[self::FLASH_OLD_KEY] = [];
+        foreach ($_SESSION as $key => $value) {
+            if (str_starts_with((string) $key, self::FLASH_PREFIX)) {
+                $flashKey = substr($key, strlen(self::FLASH_PREFIX));
+                $_SESSION[self::FLASH_OLD_KEY][$flashKey] = true;
+            }
+        }
     }
 
     /**

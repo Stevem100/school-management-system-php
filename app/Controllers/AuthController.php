@@ -23,8 +23,11 @@ class AuthController extends Controller
      */
     public function login(): void
     {
-        // If already logged in, redirect
-        if ($this->auth()->check()) {
+        // If already logged in, redirect to dashboard
+        // Check session directly to avoid creating an unnecessary DB connection
+        $user = Session::get('user');
+        $token = Session::get('token');
+        if ($user !== null && $token !== null) {
             $this->redirect('/dashboard');
             return;
         }
@@ -82,8 +85,16 @@ class AuthController extends Controller
         }
 
         // Attempt login
-        $auth = $this->auth();
-        $result = $auth->login($email, $password);
+        try {
+            $auth = $this->auth();
+            $result = $auth->login($email, $password);
+        } catch (\Throwable $e) {
+            error_log('Login DB Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            Session::flash('error', 'A database error occurred. Please contact the administrator.');
+            Session::flash('old_email', $email);
+            $this->redirect('/login');
+            return;
+        }
 
         if ($result['success']) {
             Session::flash('success', 'Welcome back! You have been logged in successfully.');
