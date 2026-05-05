@@ -230,7 +230,7 @@ abstract class Controller
      *
      * @return string|null
      */
-    protected function currentUserId(): ?string
+    protected function currentUserId(): mixed
     {
         $user = $this->currentUser();
         return $user['id'] ?? null;
