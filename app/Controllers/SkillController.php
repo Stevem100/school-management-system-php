@@ -18,6 +18,7 @@ class SkillController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $search = $this->input('search', '');
@@ -59,7 +60,8 @@ class SkillController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $this->view('skills.form', [
             'skill' => null,
@@ -73,7 +75,8 @@ class SkillController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'name'     => 'required|min:2|max:150',
@@ -110,6 +113,7 @@ class SkillController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.edit');
 
         $skill = $this->db->find('skills', $id);
         if (!$skill) {
@@ -128,7 +132,8 @@ class SkillController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $skill = $this->db->find('skills', $id);
         if (!$skill) {
@@ -169,7 +174,8 @@ class SkillController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $skill = $this->db->find('skills', $id);
         if (!$skill) {
@@ -194,6 +200,7 @@ class SkillController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $category = $this->input('category', '');
@@ -212,6 +219,7 @@ class SkillController extends Controller
     public function apiShow(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $skill = $this->db->find('skills', $id);
         if (!$skill) {
@@ -228,7 +236,8 @@ class SkillController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [
             'schoolId'    => $this->input('school_id', ''),
@@ -260,7 +269,8 @@ class SkillController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [];
         $fields = ['name', 'code', 'category', 'description', 'strand', 'subStrand', 'status'];
@@ -290,7 +300,8 @@ class SkillController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
             $this->db->deleteById('skills', $id);

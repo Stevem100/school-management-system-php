@@ -21,7 +21,8 @@ class SettingController extends Controller
     public function index(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('schools.manage');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         // Load all settings from the settings table
         $allSettings = $this->db->select('settings', [], 'key.asc');
@@ -59,7 +60,8 @@ class SettingController extends Controller
     public function update(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('schools.manage');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $fields = [
             'school_name',

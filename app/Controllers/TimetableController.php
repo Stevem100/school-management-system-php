@@ -21,6 +21,7 @@ class TimetableController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $classId = $this->input('class_id', '');
         $teacherId = $this->input('teacher_id', '');
@@ -35,7 +36,7 @@ class TimetableController extends Controller
 
         if ($classId !== '') {
             // Fetch all timetable slots for this class
-            $slots = $this->db->select('timetable', [
+            $slots = $this->db->select('timetable_entries', [
                 'classId' => ['eq' => $classId],
             ]);
 
@@ -46,7 +47,7 @@ class TimetableController extends Controller
                 $grid[$day][$startTime] = $slot;
             }
         } elseif ($teacherId !== '') {
-            $slots = $this->db->select('timetable', [
+            $slots = $this->db->select('timetable_entries', [
                 'teacherId' => ['eq' => $teacherId],
             ]);
 
@@ -91,7 +92,8 @@ class TimetableController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'class_id'   => 'required',
@@ -117,7 +119,7 @@ class TimetableController extends Controller
         ];
 
         try {
-            $this->db->insert('timetable', $data);
+            $this->db->insert('timetable_entries', $data);
             $this->success(null, 'Timetable slot added successfully.');
         } catch (\RuntimeException $e) {
             $this->error('Failed to add timetable slot: ' . $e->getMessage());
@@ -130,9 +132,10 @@ class TimetableController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
-        $slot = $this->db->find('timetable', $id);
+        $slot = $this->db->find('timetable_entries', $id);
         if (!$slot) {
             $this->error('Timetable slot not found.', 404);
         }
@@ -148,7 +151,7 @@ class TimetableController extends Controller
         ];
 
         try {
-            $this->db->updateById('timetable', $id, $data);
+            $this->db->updateById('timetable_entries', $id, $data);
             $this->success(null, 'Timetable slot updated successfully.');
         } catch (\RuntimeException $e) {
             $this->error('Failed to update timetable slot: ' . $e->getMessage());
@@ -161,10 +164,11 @@ class TimetableController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
-            $this->db->deleteById('timetable', $id);
+            $this->db->deleteById('timetable_entries', $id);
             $this->success(null, 'Timetable slot deleted successfully.');
         } catch (\RuntimeException $e) {
             $this->error('Failed to delete timetable slot: ' . $e->getMessage());
@@ -181,6 +185,7 @@ class TimetableController extends Controller
     public function apiShow(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $classId = $this->input('class_id', '');
         $teacherId = $this->input('teacher_id', '');
@@ -189,7 +194,7 @@ class TimetableController extends Controller
         if ($classId !== '') $filters['classId'] = ['eq' => $classId];
         if ($teacherId !== '') $filters['teacherId'] = ['eq' => $teacherId];
 
-        $slots = $this->db->select('timetable', $filters, 'dayOfWeek.asc,startTime.asc');
+        $slots = $this->db->select('timetable_entries', $filters, 'dayOfWeek.asc,startTime.asc');
 
         // Enrich with subject and teacher names
         foreach ($slots as &$slot) {

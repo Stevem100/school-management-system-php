@@ -18,6 +18,7 @@ class FeeController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
 
         $feeStructures = $this->fetchFeeStructures();
         $stats = $this->fetchFeeStats();
@@ -39,13 +40,15 @@ class FeeController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
         $this->success($this->fetchFeeStructures());
     }
 
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('finance.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $errors = $this->validateFeeStructure($input);
@@ -89,7 +92,8 @@ class FeeController extends Controller
     public function apiUpdate(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('finance.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $id = $input['id'] ?? '';
@@ -119,7 +123,8 @@ class FeeController extends Controller
     public function apiDestroy(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('finance.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $id = $this->input('id', '');
 
@@ -145,6 +150,7 @@ class FeeController extends Controller
     public function apiItems(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
 
         $feeStructureId = $this->input('id', '');
 
@@ -244,6 +250,7 @@ class FeeController extends Controller
     public function apiShow(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
         $id = $this->input('id', '');
         $item = $this->db->find('fee_structures', $id);
         $this->success($item);

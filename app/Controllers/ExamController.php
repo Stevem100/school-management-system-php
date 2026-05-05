@@ -18,6 +18,7 @@ class ExamController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $search = $this->input('search', '');
@@ -89,7 +90,8 @@ class ExamController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $subjects = $this->db->select('subjects', ['status' => ['eq' => 'active']], 'name.asc');
         $classes = $this->db->select('classes', ['status' => ['eq' => 'active']], 'name.asc');
@@ -108,7 +110,8 @@ class ExamController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $validation = $this->validate([
             'name'         => 'required|min:2|max:150',
@@ -153,6 +156,7 @@ class ExamController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.edit');
 
         $exam = $this->db->find('exams', $id);
         if (!$exam) {
@@ -176,7 +180,8 @@ class ExamController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $exam = $this->db->find('exams', $id);
         if (!$exam) {
@@ -224,7 +229,8 @@ class ExamController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $exam = $this->db->find('exams', $id);
         if (!$exam) {
@@ -249,6 +255,7 @@ class ExamController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $type = $this->input('type', '');
@@ -275,6 +282,7 @@ class ExamController extends Controller
     public function apiShow(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $exam = $this->db->find('exams', $id);
         if (!$exam) {
@@ -291,7 +299,8 @@ class ExamController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $data = [
             'schoolId'     => $this->input('school_id', ''),
@@ -326,7 +335,8 @@ class ExamController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $data = [];
         $fields = ['name', 'type', 'subjectId', 'classId', 'totalMarks', 'passingMarks', 'startDate', 'endDate', 'status'];
@@ -356,7 +366,8 @@ class ExamController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
             $this->db->deleteById('exams', $id);

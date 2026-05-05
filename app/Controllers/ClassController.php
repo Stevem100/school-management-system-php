@@ -18,6 +18,7 @@ class ClassController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $search = $this->input('search', '');
@@ -79,6 +80,7 @@ class ClassController extends Controller
     public function create(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.create');
 
         $teachers = $this->db->select('users', ['role' => ['eq' => 'Teacher']], 'firstName.asc');
 
@@ -95,7 +97,8 @@ class ClassController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'name'         => 'required|min:2|max:100',
@@ -135,6 +138,7 @@ class ClassController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.edit');
 
         $class = $this->db->find('classes', $id);
         if (!$class) {
@@ -156,7 +160,8 @@ class ClassController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $class = $this->db->find('classes', $id);
         if (!$class) {
@@ -199,7 +204,8 @@ class ClassController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $class = $this->db->find('classes', $id);
         if (!$class) {
@@ -224,6 +230,7 @@ class ClassController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $gradeLevel = $this->input('grade_level', '');
@@ -251,6 +258,7 @@ class ClassController extends Controller
     public function apiShow(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $class = $this->db->find('classes', $id);
         if (!$class) {
@@ -267,7 +275,8 @@ class ClassController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [
             'schoolId'       => $this->input('school_id', ''),
@@ -300,7 +309,8 @@ class ClassController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [];
         $fields = ['name', 'gradeLevel', 'section', 'capacity', 'classTeacherId', 'academicYear', 'status'];
@@ -330,7 +340,8 @@ class ClassController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
             $this->db->deleteById('classes', $id);

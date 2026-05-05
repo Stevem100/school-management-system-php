@@ -23,6 +23,7 @@ class CommunicationController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.view');
 
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = 20;
@@ -68,6 +69,7 @@ class CommunicationController extends Controller
     public function createMessage(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
 
         $this->renderWithLayout('communication.index', [
             'pageTitle'    => 'Send Message',
@@ -85,6 +87,7 @@ class CommunicationController extends Controller
     public function storeMessage(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
 
         $validation = $this->validate([
             'title'   => 'required|min:2|max:255',
@@ -129,6 +132,7 @@ class CommunicationController extends Controller
     public function notices(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.view');
 
         $page = (int) ($this->input('page', 1) ?: 1);
         $perPage = 20;
@@ -158,6 +162,7 @@ class CommunicationController extends Controller
     public function createNotice(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $this->renderWithLayout('communication.index', [
@@ -176,6 +181,7 @@ class CommunicationController extends Controller
     public function storeNotice(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $validation = $this->validate([
@@ -217,6 +223,7 @@ class CommunicationController extends Controller
     public function markAsRead(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.manage');
 
         $notification = $this->db->find('notifications', $id);
         if (!$notification) {
@@ -250,6 +257,7 @@ class CommunicationController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.delete');
 
         $notification = $this->db->find('notifications', $id);
         if (!$notification) {
@@ -279,6 +287,7 @@ class CommunicationController extends Controller
     public function apiMessages(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.view');
 
         $search = $this->input('search', '');
         $page = (int) ($this->input('page', 1) ?: 1);
@@ -312,6 +321,7 @@ class CommunicationController extends Controller
     public function apiStoreMessage(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
 
         $validation = $this->validate([
             'title'   => 'required|min:2|max:255',
@@ -349,6 +359,7 @@ class CommunicationController extends Controller
     public function apiShowMessage(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.view');
 
         $message = $this->db->find('notifications', $id);
         if (!$message) {
@@ -366,6 +377,7 @@ class CommunicationController extends Controller
     public function apiDeleteMessage(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.delete');
 
         try {
             $this->db->deleteById('notifications', $id);
@@ -382,6 +394,7 @@ class CommunicationController extends Controller
     public function apiNotices(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.view');
 
         $filters = ['type' => ['eq' => 'notice']];
         $page = (int) ($this->input('page', 1) ?: 1);
@@ -398,6 +411,7 @@ class CommunicationController extends Controller
     public function apiStoreNotice(): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $validation = $this->validate([
@@ -436,6 +450,7 @@ class CommunicationController extends Controller
     public function apiUpdateNotice(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $data = array_filter([
@@ -459,6 +474,7 @@ class CommunicationController extends Controller
     public function apiDeleteNotice(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('communication.delete');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         try {

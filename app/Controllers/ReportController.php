@@ -19,6 +19,7 @@ class ReportController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $this->renderWithLayout('reports.index', [
@@ -37,6 +38,7 @@ class ReportController extends Controller
     public function studentReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $filters = [];
@@ -82,6 +84,7 @@ class ReportController extends Controller
     public function academicReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $page = (int) ($this->input('page', 1) ?: 1);
@@ -106,6 +109,7 @@ class ReportController extends Controller
     public function financialReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Accountant']);
 
         $filters = [];
@@ -147,6 +151,7 @@ class ReportController extends Controller
     public function attendanceReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $filters = [];
@@ -180,6 +185,7 @@ class ReportController extends Controller
     public function export(string $type): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $allowedTypes = ['enrollment', 'fees', 'attendance', 'results'];
@@ -282,6 +288,7 @@ class ReportController extends Controller
     public function apiStudentReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $filters = [];
@@ -305,6 +312,7 @@ class ReportController extends Controller
     public function apiAcademicReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $filters = [];
@@ -330,6 +338,7 @@ class ReportController extends Controller
     public function apiFinancialReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Accountant']);
 
         $filters = [];
@@ -350,6 +359,7 @@ class ReportController extends Controller
     public function apiAttendanceReports(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $filters = [];
@@ -370,6 +380,7 @@ class ReportController extends Controller
     public function apiExport(): void
     {
         $this->requireAuth();
+        $this->requirePermission('reports.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Accountant']);
 
         $type = $this->input('type', '');

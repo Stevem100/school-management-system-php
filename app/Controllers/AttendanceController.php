@@ -18,6 +18,7 @@ class AttendanceController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $date = $this->input('date', date('Y-m-d'));
         $classId = $this->input('class_id', '');
@@ -83,7 +84,8 @@ class AttendanceController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.manage');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $classId = $this->input('class_id', '');
         $date = $this->input('date', date('Y-m-d'));
@@ -188,6 +190,7 @@ class AttendanceController extends Controller
     public function apiShow(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $classId = $this->input('class_id', '');
         $date = $this->input('date', date('Y-m-d'));
@@ -224,6 +227,7 @@ class AttendanceController extends Controller
     public function apiReport(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $classId = $this->input('class_id', '');
         $studentId = $this->input('student_id', '');

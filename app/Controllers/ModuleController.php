@@ -22,6 +22,7 @@ class ModuleController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $page = (int) ($this->input('page', 1) ?: 1);
@@ -117,6 +118,7 @@ class ModuleController extends Controller
     public function create(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $this->index(); // Reuse index with empty form
@@ -129,6 +131,7 @@ class ModuleController extends Controller
     public function store(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $validation = $this->validate([
@@ -178,6 +181,7 @@ class ModuleController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);
@@ -252,6 +256,7 @@ class ModuleController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);
@@ -290,6 +295,7 @@ class ModuleController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);
@@ -316,6 +322,7 @@ class ModuleController extends Controller
     public function toggle(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);
@@ -340,6 +347,7 @@ class ModuleController extends Controller
     public function updatePermissions(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $roleId = (int) ($this->input('role_id', 0) ?: 0);
@@ -392,6 +400,7 @@ class ModuleController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.view');
 
         $search = $this->input('search', '');
         $page = (int) ($this->input('page', 1) ?: 1);
@@ -412,6 +421,7 @@ class ModuleController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $validation = $this->validate(['name' => 'required|min:2|max:100']);
@@ -447,6 +457,7 @@ class ModuleController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);
@@ -481,6 +492,7 @@ class ModuleController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('modules.manage');
         $this->requireRole(['SuperAdmin']);
 
         $module = $this->db->find('modules', $id);

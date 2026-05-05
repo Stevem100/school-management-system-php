@@ -18,6 +18,7 @@ class ResultController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $examId = $this->input('exam_id', '');
@@ -119,7 +120,8 @@ class ResultController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $validation = $this->validate([
             'exam_id'        => 'required',
@@ -156,7 +158,8 @@ class ResultController extends Controller
     public function bulkStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $examId = $this->input('exam_id', '');
         $results = $this->input('results', []);
@@ -214,7 +217,8 @@ class ResultController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal', 'Teacher']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $result = $this->db->find('exam_results', $id);
         if (!$result) {
@@ -245,7 +249,8 @@ class ResultController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
             $this->db->deleteById('exam_results', $id);
@@ -261,6 +266,7 @@ class ResultController extends Controller
     public function examResults(string $examId): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $exam = $this->db->find('exams', $examId);
         if (!$exam) {
@@ -313,6 +319,7 @@ class ResultController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $examId = $this->input('exam_id', '');

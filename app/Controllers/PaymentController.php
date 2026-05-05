@@ -19,6 +19,7 @@ class PaymentController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
 
         $payments = $this->fetchPayments();
         $students = $this->fetchStudents();
@@ -42,13 +43,15 @@ class PaymentController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
         $this->success($this->fetchPayments());
     }
 
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Accountant']);
+        $this->requirePermission('finance.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Accountant']);
 
         $input = $this->requestJson();
         $errors = $this->validatePayment($input);
@@ -82,7 +85,8 @@ class PaymentController extends Controller
     public function apiUpdate(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Accountant']);
+        $this->requirePermission('finance.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Accountant']);
 
         $input = $this->requestJson();
         $id = $input['id'] ?? '';
@@ -110,7 +114,8 @@ class PaymentController extends Controller
     public function apiDestroy(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('finance.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $id = $this->input('id', '');
         if (empty($id)) {
@@ -255,6 +260,7 @@ class PaymentController extends Controller
     public function apiShow(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
         $id = $this->input('id', '');
         $item = $this->db->find('payments', $id);
         $this->success($item);
@@ -265,6 +271,7 @@ class PaymentController extends Controller
     public function apiGenerateReceipt(): void
     {
         $this->requireAuth();
+        $this->requirePermission('finance.view');
         $id = $this->input('id', '');
         $payment = $this->db->find('payments', $id);
         $this->success($payment);

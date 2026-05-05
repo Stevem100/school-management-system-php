@@ -19,7 +19,8 @@ class BranchController extends Controller
     public function index(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.view');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $page = (int) ($this->input('page', 1) ?? 1);
         $search = $this->input('search', '');
@@ -70,7 +71,8 @@ class BranchController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $schools = $this->db->select('schools', [], 'name.asc');
 
@@ -94,7 +96,8 @@ class BranchController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'school_id' => 'required',
@@ -145,7 +148,8 @@ class BranchController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $branch = $this->db->find('branches', $id);
 
@@ -193,7 +197,8 @@ class BranchController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $branch = $this->db->find('branches', $id);
 
@@ -260,7 +265,8 @@ class BranchController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin']);
+        $this->requirePermission('branches.delete');
+        $this->requireRole(['SuperAdmin']);
 
         $branch = $this->db->find('branches', $id);
 
@@ -286,6 +292,7 @@ class BranchController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('branches.view');
 
         $search = $this->input('search', '');
         $schoolId = $this->input('school_id', '');
@@ -320,7 +327,8 @@ class BranchController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'school_id' => 'required',
@@ -357,7 +365,8 @@ class BranchController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('branches.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $branch = $this->db->find('branches', $id);
         if (!$branch) {
@@ -389,7 +398,8 @@ class BranchController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin']);
+        $this->requirePermission('branches.delete');
+        $this->requireRole(['SuperAdmin']);
 
         $branch = $this->db->find('branches', $id);
         if (!$branch) {

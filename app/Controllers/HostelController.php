@@ -19,6 +19,7 @@ class HostelController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $filters = [];
@@ -74,6 +75,7 @@ class HostelController extends Controller
     public function createRoom(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $result = $this->paginate('hostel_rooms', 1, 15, [], 'room_number.asc');
@@ -100,6 +102,7 @@ class HostelController extends Controller
     public function storeRoom(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $validation = $this->validate([
@@ -145,6 +148,7 @@ class HostelController extends Controller
     public function showRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -171,6 +175,7 @@ class HostelController extends Controller
     public function editRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -206,6 +211,7 @@ class HostelController extends Controller
     public function updateRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -257,6 +263,7 @@ class HostelController extends Controller
     public function deleteRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.delete');
         $this->requireRole(['SuperAdmin']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -284,6 +291,7 @@ class HostelController extends Controller
     public function allocations(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $this->renderWithLayout('hostel.index', [
@@ -302,6 +310,7 @@ class HostelController extends Controller
     public function createAllocation(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $this->renderWithLayout('hostel.index', [
@@ -320,6 +329,7 @@ class HostelController extends Controller
     public function storeAllocation(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $data = [
@@ -350,6 +360,7 @@ class HostelController extends Controller
     public function apiRooms(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
 
         $search = $this->input('search', '');
         $block = $this->input('block', '');
@@ -379,6 +390,7 @@ class HostelController extends Controller
     public function apiShowRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
 
         $room = $this->db->find('hostel_rooms', $id);
         if (!$room) {
@@ -396,6 +408,7 @@ class HostelController extends Controller
     public function apiStoreRoom(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $validation = $this->validate([
@@ -437,6 +450,7 @@ class HostelController extends Controller
     public function apiUpdateRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -470,6 +484,7 @@ class HostelController extends Controller
     public function apiDeleteRoom(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.delete');
         $this->requireRole(['SuperAdmin']);
 
         $room = $this->db->find('hostel_rooms', $id);
@@ -493,6 +508,7 @@ class HostelController extends Controller
     public function apiAllocations(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.view');
 
         $filters = [];
         $status = $this->input('status', '');
@@ -511,6 +527,7 @@ class HostelController extends Controller
     public function apiStoreAllocation(): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         $data = [
@@ -535,6 +552,7 @@ class HostelController extends Controller
     public function apiDeleteAllocation(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('hostel.delete');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'HostelManager']);
 
         try {

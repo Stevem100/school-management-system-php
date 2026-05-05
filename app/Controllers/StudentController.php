@@ -19,7 +19,8 @@ class StudentController extends Controller
     public function index(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean', 'Teacher', 'Parent']);
+        $this->requirePermission('students.view');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher', 'Parent']);
 
         $page = (int) ($this->input('page', 1) ?? 1);
         $search = $this->input('search', '');
@@ -80,7 +81,8 @@ class StudentController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $branches = $this->db->select('branches', [], 'name.asc');
         $classes = $this->db->select('classes', [], 'name.asc');
@@ -103,7 +105,8 @@ class StudentController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $validation = $this->validate([
             'first_name'     => 'required|min:2|max:100',
@@ -162,7 +165,8 @@ class StudentController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $student = $this->db->find('users', $id);
 
@@ -206,7 +210,8 @@ class StudentController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $student = $this->db->find('users', $id);
 
@@ -289,7 +294,8 @@ class StudentController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('students.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $student = $this->db->find('users', $id);
 
@@ -386,7 +392,8 @@ class StudentController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $validation = $this->validate([
             'first_name'   => 'required|min:2|max:100',
@@ -435,7 +442,8 @@ class StudentController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Dean']);
+        $this->requirePermission('students.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean']);
 
         $student = $this->db->find('users', $id);
         if (!$student || $student['user_type'] !== 'student') {
@@ -495,7 +503,8 @@ class StudentController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('students.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $student = $this->db->find('users', $id);
         if (!$student || $student['user_type'] !== 'student') {

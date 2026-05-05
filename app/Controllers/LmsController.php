@@ -19,6 +19,7 @@ class LmsController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher', 'Student']);
 
         $filters = [];
@@ -69,6 +70,7 @@ class LmsController extends Controller
     public function createCourse(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $result = $this->paginate('lms_courses', 1, 12, [], 'created_at.desc');
@@ -95,6 +97,7 @@ class LmsController extends Controller
     public function storeCourse(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $validation = $this->validate([
@@ -134,6 +137,7 @@ class LmsController extends Controller
     public function showCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $course = $this->db->find('lms_courses', $id);
         if (!$course) {
@@ -158,6 +162,7 @@ class LmsController extends Controller
     public function editCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $course = $this->db->find('lms_courses', $id);
@@ -192,6 +197,7 @@ class LmsController extends Controller
     public function updateCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $course = $this->db->find('lms_courses', $id);
@@ -237,6 +243,7 @@ class LmsController extends Controller
     public function assignments(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $this->renderWithLayout('lms.index', [
             'pageTitle'   => 'Assignments',
@@ -254,6 +261,7 @@ class LmsController extends Controller
     public function createAssignment(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $this->renderWithLayout('lms.index', [
@@ -272,6 +280,7 @@ class LmsController extends Controller
     public function storeAssignment(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $data = [
@@ -300,6 +309,7 @@ class LmsController extends Controller
     public function submissions(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $this->renderWithLayout('lms.index', [
             'pageTitle'   => 'Submissions',
@@ -321,6 +331,7 @@ class LmsController extends Controller
     public function apiCourses(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $search = $this->input('search', '');
         $status = $this->input('status', '');
@@ -346,6 +357,7 @@ class LmsController extends Controller
     public function apiShowCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $course = $this->db->find('lms_courses', $id);
         if (!$course) {
@@ -363,6 +375,7 @@ class LmsController extends Controller
     public function apiStoreCourse(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $validation = $this->validate([
@@ -398,6 +411,7 @@ class LmsController extends Controller
     public function apiUpdateCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $course = $this->db->find('lms_courses', $id);
@@ -429,6 +443,7 @@ class LmsController extends Controller
     public function apiDeleteCourse(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.delete');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $course = $this->db->find('lms_courses', $id);
@@ -452,6 +467,7 @@ class LmsController extends Controller
     public function apiAssignments(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $filters = [];
         $courseId = $this->input('course_id', '');
@@ -470,6 +486,7 @@ class LmsController extends Controller
     public function apiStoreAssignment(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.create');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $data = [
@@ -496,6 +513,7 @@ class LmsController extends Controller
     public function apiShowAssignment(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $assignment = $this->db->find('lms_assignments', $id);
         if (!$assignment) {
@@ -513,6 +531,7 @@ class LmsController extends Controller
     public function apiUpdateAssignment(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.edit');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         $data = array_filter([
@@ -538,6 +557,7 @@ class LmsController extends Controller
     public function apiDeleteAssignment(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.delete');
         $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']);
 
         try {
@@ -555,6 +575,7 @@ class LmsController extends Controller
     public function apiSubmitAssignment(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.manage');
 
         $data = [
             'assignment_id' => $id,
@@ -578,6 +599,7 @@ class LmsController extends Controller
     public function apiSubmissions(): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $filters = [];
         $assignmentId = $this->input('assignment_id', '');
@@ -596,6 +618,7 @@ class LmsController extends Controller
     public function apiShowSubmission(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('lms.view');
 
         $submission = $this->db->find('lms_submissions', $id);
         if (!$submission) {

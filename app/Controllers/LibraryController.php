@@ -18,6 +18,7 @@ class LibraryController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.view');
 
         $books     = $this->fetchBooks();
         $borrowals = $this->fetchBorrowals();
@@ -41,13 +42,15 @@ class LibraryController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.view');
         $this->success($this->fetchBooks());
     }
 
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Librarian']);
+        $this->requirePermission('library.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Librarian']);
 
         $input = $this->requestJson();
         $errors = $this->validateBook($input);
@@ -79,7 +82,8 @@ class LibraryController extends Controller
     public function apiUpdate(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin', 'Librarian']);
+        $this->requirePermission('library.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Librarian']);
 
         $input = $this->requestJson();
         $id = $input['id'] ?? '';
@@ -111,7 +115,8 @@ class LibraryController extends Controller
     public function apiDestroy(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('library.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $id = $this->input('id', '');
         if (empty($id)) {
@@ -130,6 +135,7 @@ class LibraryController extends Controller
     public function apiBorrow(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.manage');
 
         $input = $this->requestJson();
         if (empty($input['book_id']) || empty($input['student_id'])) {
@@ -165,6 +171,7 @@ class LibraryController extends Controller
     public function apiReturn(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.manage');
 
         $input = $this->requestJson();
         $id = $input['borrowal_id'] ?? '';
@@ -313,6 +320,7 @@ class LibraryController extends Controller
     public function apiShowBook(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.view');
         $id = $this->input('id', '');
         $this->success($this->db->find('library_books', $id));
     }
@@ -321,6 +329,7 @@ class LibraryController extends Controller
     public function apiIssues(): void
     {
         $this->requireAuth();
+        $this->requirePermission('library.view');
         $this->success($this->fetchBorrowals());
     }
     public function apiStoreIssue(): void { $this->apiBorrow(); }

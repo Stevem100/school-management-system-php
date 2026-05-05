@@ -19,7 +19,8 @@ class UserController extends Controller
     public function index(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.view');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $page = (int) ($this->input('page', 1) ?? 1);
         $search = $this->input('search', '');
@@ -115,7 +116,8 @@ class UserController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $schools = $this->db->select('schools', [], 'name.asc');
         $allRoles = $this->db->select('roles', [], 'name.asc');
@@ -141,7 +143,8 @@ class UserController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'first_name' => 'required|min:2|max:100',
@@ -214,7 +217,8 @@ class UserController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $editUser = $this->db->find('users', $id);
 
@@ -263,7 +267,8 @@ class UserController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $editUser = $this->db->find('users', $id);
 
@@ -357,7 +362,8 @@ class UserController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin']);
+        $this->requirePermission('users.delete');
+        $this->requireRole(['SuperAdmin']);
 
         $editUser = $this->db->find('users', $id);
 
@@ -393,6 +399,7 @@ class UserController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('users.view');
 
         $search = $this->input('search', '');
         $schoolId = $this->input('school_id', '');
@@ -428,7 +435,8 @@ class UserController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'first_name' => 'required|min:2|max:100',
@@ -478,7 +486,8 @@ class UserController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin', 'School Admin']);
+        $this->requirePermission('users.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $editUser = $this->db->find('users', $id);
         if (!$editUser) {
@@ -527,7 +536,8 @@ class UserController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin']);
+        $this->requirePermission('users.delete');
+        $this->requireRole(['SuperAdmin']);
 
         $editUser = $this->db->find('users', $id);
         if (!$editUser) {

@@ -19,7 +19,8 @@ class RoleController extends Controller
     public function index(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $page = (int) ($this->input('page', 1) ?? 1);
         $search = $this->input('search', '');
@@ -87,7 +88,8 @@ class RoleController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $this->index();
     }
@@ -99,7 +101,8 @@ class RoleController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $validation = $this->validate([
             'name'        => 'required|min:2|max:100',
@@ -155,7 +158,8 @@ class RoleController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $role = $this->db->find('roles', $id);
 
@@ -211,7 +215,8 @@ class RoleController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $role = $this->db->find('roles', $id);
 
@@ -268,7 +273,8 @@ class RoleController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $role = $this->db->find('roles', $id);
 
@@ -304,6 +310,7 @@ class RoleController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('users.manage');
 
         $search = $this->input('search', '');
         $scope = $this->input('scope', '');
@@ -329,7 +336,8 @@ class RoleController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $validation = $this->validate([
             'name'        => 'required|min:2|max:100',
@@ -360,7 +368,8 @@ class RoleController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $role = $this->db->find('roles', $id);
         if (!$role) {
@@ -388,7 +397,8 @@ class RoleController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin']);
+        $this->requirePermission('users.manage');
+        $this->requireRole(['SuperAdmin']);
 
         $role = $this->db->find('roles', $id);
         if (!$role) {

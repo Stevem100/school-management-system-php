@@ -17,6 +17,7 @@ class AIController extends Controller
     public function chat(): void
     {
         $this->requireAuth();
+        $this->requirePermission('ai.view');
 
         $this->renderWithLayout('ai/chat', [
             'pageTitle'  => 'AI Chat',
@@ -30,6 +31,7 @@ class AIController extends Controller
     public function settings(): void
     {
         $this->requireAuth();
+        $this->requirePermission('ai.manage');
 
         // Fetch AI settings from database
         $aiSettings = [];
@@ -52,6 +54,7 @@ class AIController extends Controller
     public function analytics(): void
     {
         $this->requireAuth();
+        $this->requirePermission('ai.view');
 
         // Fetch AI usage statistics
         $stats = [

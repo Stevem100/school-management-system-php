@@ -18,6 +18,7 @@ class TransportController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.view');
 
         $routes      = $this->fetchRoutes();
         $vehicles    = $this->fetchVehicles();
@@ -43,13 +44,15 @@ class TransportController extends Controller
     public function apiRoutes(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.view');
         $this->success($this->fetchRoutes());
     }
 
     public function apiStoreRoute(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('transport.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $errors = $this->validateRoute($input);
@@ -78,7 +81,8 @@ class TransportController extends Controller
     public function apiUpdateRoute(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('transport.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $id = $input['id'] ?? '';
@@ -107,7 +111,8 @@ class TransportController extends Controller
     public function apiDestroyRoute(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('transport.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $id = $this->input('id', '');
         if (empty($id)) {
@@ -134,13 +139,15 @@ class TransportController extends Controller
     public function apiVehicles(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.view');
         $this->success($this->fetchVehicles());
     }
 
     public function apiStoreVehicle(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('transport.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $errors = $this->validateVehicle($input);
@@ -169,7 +176,8 @@ class TransportController extends Controller
     public function apiUpdateVehicle(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin', 'Branch Admin']);
+        $this->requirePermission('transport.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin', 'BranchAdmin']);
 
         $input = $this->requestJson();
         $id = $input['id'] ?? '';
@@ -198,7 +206,8 @@ class TransportController extends Controller
     public function apiDestroyVehicle(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('transport.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $id = $this->input('id', '');
         if (empty($id)) {
@@ -221,6 +230,7 @@ class TransportController extends Controller
     public function apiAssignStudent(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.manage');
 
         $input = $this->requestJson();
         if (empty($input['student_id']) || empty($input['route_id'])) {
@@ -246,6 +256,7 @@ class TransportController extends Controller
     public function apiRemoveAssignment(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.manage');
 
         $id = $this->input('id', '');
         if (empty($id)) {
@@ -388,6 +399,7 @@ class TransportController extends Controller
     public function apiShowRoute(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.view');
         $id = $this->input('id', '');
         $this->success($this->db->find('transport_routes', $id));
     }
@@ -395,7 +407,8 @@ class TransportController extends Controller
     public function apiDeleteRoute(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('transport.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
         $id = $this->input('id', '');
         if (empty($id)) { $this->error('Route ID is required.', 422); return; }
         $this->db->deleteById('transport_routes', $id);
@@ -405,6 +418,7 @@ class TransportController extends Controller
     public function apiShowVehicle(): void
     {
         $this->requireAuth();
+        $this->requirePermission('transport.view');
         $id = $this->input('id', '');
         $this->success($this->db->find('transport_vehicles', $id));
     }
@@ -412,7 +426,8 @@ class TransportController extends Controller
     public function apiDeleteVehicle(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Super Admin', 'School Admin']);
+        $this->requirePermission('transport.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
         $id = $this->input('id', '');
         if (empty($id)) { $this->error('Vehicle ID is required.', 422); return; }
         $this->db->deleteById('transport_vehicles', $id);

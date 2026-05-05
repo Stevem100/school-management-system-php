@@ -124,3 +124,63 @@ Stage Summary:
 - Notifications recipient_id error resolved by using user_id column instead
 - All academic views confirmed styled with consistent Tailwind CSS
 - Commit ab816d6 pushed to GitHub
+
+---
+Task ID: 7
+Agent: Sub-Agent
+Task: Fix all PHP controllers RBAC - role names and permission checks
+
+Work Log:
+- Fixed role names across all 25 controllers to match DB values (no spaces in names)
+- Replaced all `'Super Admin'` → `'SuperAdmin'` (StudentController, FeeController, PaymentController, TransportController, LibraryController, RoleController, SchoolController)
+- Replaced all `'School Admin'` → `'SchoolAdmin'` (StudentController, FeeController, PaymentController, TransportController, LibraryController, RoleController, BranchController, UserController, SettingController)
+- Replaced all `'Branch Admin'` → `'BranchAdmin'` (StudentController, FeeController, PaymentController, TransportController, LibraryController)
+- Replaced `'Admin', 'Principal'` → `['SuperAdmin', 'SchoolAdmin', 'BranchAdmin', 'Dean', 'Teacher']` (AttendanceController, ResultController)
+- Replaced `'Admin', 'Principal'` → `['SuperAdmin', 'SchoolAdmin']` (ClassController, ExamController, SubjectController, SkillController, TimetableController)
+- Replaced `['Super Admin', 'Admin']` → `['SuperAdmin']` (RoleController, SchoolController)
+- Replaced `['Super Admin', 'Admin', 'School Admin']` → `['SuperAdmin', 'SchoolAdmin']` (BranchController, UserController)
+- Fixed TimetableController: all `timetable` DB references → `timetable_entries`
+- Added `requirePermission()` calls BEFORE `requireRole()` in every controller method (232 total permission checks)
+- Permission patterns: students.*, academic.*, finance.*, transport.*, hostel.*, library.*, lms.*, communication.*, reports.*, users.*, modules.*, schools.*, branches.*, ai.*
+- Kept existing role checks as secondary authorization layer (SuperAdmin auto-bypasses in requireRole)
+
+Stage Summary:
+- 25 controllers updated with correct role names (no spaces)
+- 232 requirePermission() calls added across all controllers
+- TimetableController fixed to use `timetable_entries` table name
+- AuthController, DashboardController, ProfileController left unchanged (no special permissions needed)
+- Controller.php (base class) left unchanged
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Create 40 missing view files (create/show/edit) for all modules
+
+Work Log:
+- Read existing view files to understand styling patterns: dashboard/index.php, schools/index.php, classes/form.php, students/index.php, fees/index.php, payments/index.php, users/index.php, roles/index.php
+- Identified consistent styling patterns: Tailwind CSS with dark mode, emerald accent colors, space-y-6 wrapper, card-based layouts, back navigation arrows
+- Created 40 view files across 13 modules:
+  - Schools: create.php, show.php, edit.php (3)
+  - Branches: create.php, show.php, edit.php (3)
+  - Users: create.php, show.php, edit.php (3)
+  - Roles: create.php, show.php (with permissions list), edit.php (with permission checkboxes) (3)
+  - Students: create.php, show.php (with stats, personal/academic/guardian info cards), edit.php (3)
+  - Classes: show.php (with enrolled students list, stats), edit.php (2)
+  - Subjects: show.php, edit.php (2)
+  - Exams: show.php (with stats, dates), edit.php (2)
+  - Results: create.php, show.php (with score card), edit.php (3)
+  - Attendance: take.php (student list with present/absent/late radios), show.php (history table), edit.php (3)
+  - Fees: create.php, show.php (with fee items breakdown), edit.php (3)
+  - Payments: create.php, show.php (receipt card), edit.php (3)
+  - Timetable: create.php, show.php, edit.php (3)
+  - Skills: show.php, edit.php (2)
+  - Modules: show.php (with permissions list), edit.php (2)
+
+Stage Summary:
+- 40 new view files created (all content-only partials, layout handled by renderWithLayout())
+- All views use consistent Tailwind CSS styling with dark mode support
+- All views use emerald color scheme for primary actions
+- Create/edit forms include CSRF token field, proper labels, input styling, submit/cancel buttons
+- Show/detail pages include back button, section cards with organized data, status badges, edit links
+- All forms are mobile responsive with sm:/md:/lg: breakpoints
+- Empty states included where applicable

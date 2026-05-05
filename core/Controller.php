@@ -171,6 +171,7 @@ abstract class Controller
 
     /**
      * Require specific role(s). Returns 403 if user doesn't have the role.
+     * SuperAdmin always has access (bypasses all role checks).
      *
      * @param string|array $roles One or more required role names
      * @return void
@@ -180,6 +181,12 @@ abstract class Controller
         $this->requireAuth();
 
         $auth = $this->auth();
+
+        // SuperAdmin always bypasses role checks
+        if ($auth->hasRole('SuperAdmin')) {
+            return;
+        }
+
         $rolesArray = is_array($roles) ? $roles : [$roles];
 
         if (!$auth->hasAnyRole($rolesArray)) {
@@ -191,6 +198,202 @@ abstract class Controller
             Session::flash('error', 'You do not have permission to access this page.');
             Response::redirect('/dashboard');
         }
+    }
+
+    /**
+     * Require a specific permission. Checks the permissions table
+     * via the user's roles and role_permissions join.
+     * SuperAdmin always has access (bypasses all permission checks).
+     *
+     * @param string $permission Permission name (e.g. 'students.view', 'finance.manage')
+     * @return void
+     */
+    protected function requirePermission(string $permission): void
+    {
+        $this->requireAuth();
+
+        $auth = $this->auth();
+
+        // SuperAdmin always bypasses permission checks
+        if ($auth->hasRole('SuperAdmin')) {
+            return;
+        }
+
+        // Get current user's role IDs from session
+        $roleData = Session::get('role_data', []);
+        if (empty($roleData)) {
+            $this->denyAccess();
+            return;
+        }
+
+        $roleIds = array_column($roleData, 'id');
+        if (empty($roleIds)) {
+            $this->denyAccess();
+            return;
+        }
+
+        // Check if any of the user's roles has this permission
+        $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+        $sql = "SELECT COUNT(*) as cnt 
+                FROM role_permissions rp 
+                INNER JOIN permissions p ON rp.permission_id = p.id 
+                WHERE rp.role_id IN ({$placeholders}) AND p.name = ?";
+        $params = array_merge($roleIds, [$permission]);
+
+        try {
+            $result = $this->db->raw($sql, $params);
+            $count = (int) ($result[0]['cnt'] ?? 0);
+            if ($count > 0) {
+                return; // Permission granted
+            }
+        } catch (\RuntimeException $e) {
+            // If DB check fails, deny access for safety
+        }
+
+        $this->denyAccess();
+    }
+
+    /**
+     * Require any of the listed permissions.
+     * SuperAdmin always has access.
+     *
+     * @param array $permissions Array of permission names
+     * @return void
+     */
+    protected function requireAnyPermission(array $permissions): void
+    {
+        $this->requireAuth();
+
+        $auth = $this->auth();
+
+        // SuperAdmin always bypasses
+        if ($auth->hasRole('SuperAdmin')) {
+            return;
+        }
+
+        $roleData = Session::get('role_data', []);
+        if (empty($roleData)) {
+            $this->denyAccess();
+            return;
+        }
+
+        $roleIds = array_column($roleData, 'id');
+        if (empty($roleIds)) {
+            $this->denyAccess();
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+        $permPlaceholders = implode(',', array_fill(0, count($permissions), '?'));
+        $sql = "SELECT COUNT(*) as cnt 
+                FROM role_permissions rp 
+                INNER JOIN permissions p ON rp.permission_id = p.id 
+                WHERE rp.role_id IN ({$placeholders}) AND p.name IN ({$permPlaceholders})";
+        $params = array_merge($roleIds, $permissions);
+
+        try {
+            $result = $this->db->raw($sql, $params);
+            $count = (int) ($result[0]['cnt'] ?? 0);
+            if ($count > 0) {
+                return; // At least one permission granted
+            }
+        } catch (\RuntimeException $e) {
+            // Deny on error
+        }
+
+        $this->denyAccess();
+    }
+
+    /**
+     * Check if current user has a specific permission (non-blocking).
+     *
+     * @param string $permission Permission name
+     * @return bool
+     */
+    protected function hasPermission(string $permission): bool
+    {
+        $auth = $this->auth();
+        if ($auth->hasRole('SuperAdmin')) {
+            return true;
+        }
+
+        $roleData = Session::get('role_data', []);
+        if (empty($roleData)) {
+            return false;
+        }
+
+        $roleIds = array_column($roleData, 'id');
+        if (empty($roleIds)) {
+            return false;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+        $sql = "SELECT COUNT(*) as cnt 
+                FROM role_permissions rp 
+                INNER JOIN permissions p ON rp.permission_id = p.id 
+                WHERE rp.role_id IN ({$placeholders}) AND p.name = ?";
+        $params = array_merge($roleIds, [$permission]);
+
+        try {
+            $result = $this->db->raw($sql, $params);
+            return (int) ($result[0]['cnt'] ?? 0) > 0;
+        } catch (\RuntimeException $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get all permission names for the current user.
+     *
+     * @return array Array of permission name strings
+     */
+    protected function getUserPermissions(): array
+    {
+        $auth = $this->auth();
+        if ($auth->hasRole('SuperAdmin')) {
+            // SuperAdmin has all permissions - fetch from DB
+            try {
+                $allPerms = $this->db->select('permissions', []);
+                return array_column($allPerms, 'name');
+            } catch (\RuntimeException $e) {
+                return [];
+            }
+        }
+
+        $roleData = Session::get('role_data', []);
+        if (empty($roleData)) {
+            return [];
+        }
+
+        $roleIds = array_column($roleData, 'id');
+        if (empty($roleIds)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+        $sql = "SELECT DISTINCT p.name 
+                FROM role_permissions rp 
+                INNER JOIN permissions p ON rp.permission_id = p.id 
+                WHERE rp.role_id IN ({$placeholders})";
+
+        try {
+            $result = $this->db->raw($sql, $roleIds);
+            return array_column($result, 'name');
+        } catch (\RuntimeException $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Deny access and redirect.
+     */
+    private function denyAccess(): void
+    {
+        if (Request::isAjax() || Request::expectsJson()) {
+            Response::forbidden('You do not have permission to access this resource.');
+        }
+        Session::flash('error', 'You do not have permission to access this page.');
+        Response::redirect('/dashboard');
     }
 
     /**

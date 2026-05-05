@@ -18,6 +18,7 @@ class SubjectController extends Controller
     public function index(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $search = $this->input('search', '');
@@ -59,7 +60,8 @@ class SubjectController extends Controller
     public function create(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $this->view('subjects.form', [
             'subject' => null,
@@ -73,7 +75,8 @@ class SubjectController extends Controller
     public function store(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $validation = $this->validate([
             'name'         => 'required|min:2|max:100',
@@ -111,6 +114,7 @@ class SubjectController extends Controller
     public function edit(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.edit');
 
         $subject = $this->db->find('subjects', $id);
         if (!$subject) {
@@ -129,7 +133,8 @@ class SubjectController extends Controller
     public function update(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $subject = $this->db->find('subjects', $id);
         if (!$subject) {
@@ -170,7 +175,8 @@ class SubjectController extends Controller
     public function delete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $subject = $this->db->find('subjects', $id);
         if (!$subject) {
@@ -195,6 +201,7 @@ class SubjectController extends Controller
     public function apiIndex(): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $filters = [];
         $type = $this->input('type', '');
@@ -217,6 +224,7 @@ class SubjectController extends Controller
     public function apiShow(string $id): void
     {
         $this->requireAuth();
+        $this->requirePermission('academic.view');
 
         $subject = $this->db->find('subjects', $id);
         if (!$subject) {
@@ -233,7 +241,8 @@ class SubjectController extends Controller
     public function apiStore(): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.create');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [
             'schoolId'    => $this->input('school_id', ''),
@@ -265,7 +274,8 @@ class SubjectController extends Controller
     public function apiUpdate(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.edit');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         $data = [];
         $fields = ['name', 'code', 'description', 'type', 'creditHours', 'status'];
@@ -295,7 +305,8 @@ class SubjectController extends Controller
     public function apiDelete(string $id): void
     {
         $this->requireAuth();
-        $this->requireRole(['Admin', 'Principal']);
+        $this->requirePermission('academic.delete');
+        $this->requireRole(['SuperAdmin', 'SchoolAdmin']);
 
         try {
             $this->db->deleteById('subjects', $id);
