@@ -89,3 +89,30 @@ Stage Summary:
 - AI Assistant module fully created (controller + 3 views + 3 routes)
 - All SuperAdmin menu items have working navigation targets
 - Commit 35399f0 pushed to GitHub
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Fix notifications SQL error, module permissions, view column mismatches
+
+Work Log:
+- Diagnosed SQLSTATE[42S22]: Column 'recipient_id' not found in notifications table
+- Root cause: CommunicationController uses columns (recipient_id, sender_id, priority) that didn't exist in DB schema
+- Also found modules table was missing columns (display_name, icon, route, sort_order, is_active) that the view expected
+- ModuleController used wrong role names: 'Super Admin' and 'Admin' instead of 'SuperAdmin' and 'SchoolAdmin'
+- Fix 1: Added sender_id, recipient_id, priority columns to notifications table in setup.sql
+- Fix 2: Added display_name, icon, route, sort_order, is_active columns to modules table in setup.sql
+- Fix 3: Created migrate.sql for existing databases with ALTER TABLE statements + data migration
+- Fix 4: Updated seed data - 15 modules with display names, icons, routes, sort orders
+- Fix 5: Rewrote ModuleController - loads permissions from permissions/role_permissions tables, shows role badges per module
+- Fix 6: Added updatePermissions() endpoint for grant/revoke permissions by role
+- Fix 7: Updated modules/index.php - shows colored role badges indicating which roles have access
+- Fix 8: Updated communication/index.php - safe sender_id display fallback
+
+Stage Summary:
+- notifications table now has sender_id, recipient_id, priority columns
+- modules table now has display_name, icon, route, sort_order, is_active columns
+- ModuleController loads and displays permissions from role_permissions table
+- Each module card shows colored badges for roles that have access
+- migrate.sql created for existing database updates
+- Commit 415608c pushed to GitHub
