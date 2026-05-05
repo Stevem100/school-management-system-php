@@ -19,28 +19,28 @@ Critical Bug Fixes:
 - Fixed users table: Renamed `password` column to `password_hash` to match Auth.php's camelCase `passwordHash` expectation
 - Updated seed-data.sql INSERT to use `password_hash` column name
 - Fixed UserController.php: Changed all `password` + `password_hash()` (bcrypt) to `passwordHash` + `hash('sha256', ...)` for consistency
-- Fixed StudentController.php: Same bcrypt→SHA-256 conversion for both store() and apiStore()
+- Fixed StudentController.php: Same bcrypt to SHA-256 conversion for both store() and apiStore()
 - Fixed ProfileController.php: Changed password verification from `password_verify()` (bcrypt) to `hash_equals()` with SHA-256, changed `data['password']` to `data['passwordHash']`
 
 Stage Summary:
 - 4 new view files created (form.php for classes, subjects, exams, skills)
-- 3 SQL/DB schema fixes applied (sessions.is_active, users.password→password_hash, seed data)
+- 3 SQL/DB schema fixes applied (sessions.is_active, users.password to password_hash, seed data)
 - 3 controller files fixed for password hashing consistency (UserController, StudentController, ProfileController)
 - All views use consistent styling: Tailwind CSS dark mode, emerald accent, card-based layout, back navigation
 
 ---
 Task ID: 2
 Agent: Main Agent
-Task: Fix fatal PHP errors — Controller class name conflict and missing BASE_PATH constant
+Task: Fix fatal PHP errors - Controller class name conflict and missing BASE_PATH constant
 
 Work Log:
 - Diagnosed "Cannot declare class App\Controllers\Controller because the name is already in use" error
-- Root cause: `app/Controllers/Controller.php` had `use Core\Controller;` followed by `class Controller extends Controller` — PHP rejects this because `Controller` is already used as an import alias
+- Root cause: `app/Controllers/Controller.php` had `use Core\Controller;` followed by `class Controller extends Controller`
 - Fix: Changed `use Core\Controller` to `use Core\Controller as CoreController` and updated `class Controller extends CoreController`
-- Discovered 7 other controllers (TimetableController, AttendanceController, SkillController, SubjectController, ExamController, ClassController, ResultController) had `use Core\Controller;` which made them bypass `App\Controllers\Controller` and extend `Core\Controller` directly
+- Discovered 7 other controllers had `use Core\Controller;` which made them bypass `App\Controllers\Controller`
 - Removed `use Core\Controller;` from all 7 controllers so they properly extend `App\Controllers\Controller`
 - Found `BASE_PATH` constant was used in `core/Controller.php` but never defined
-- Added `define('BASE_PATH', __DIR__);` to `index.php` before all core file loading
+- Added `define('BASE_PATH', __DIR__);` to `index.php`
 
 Stage Summary:
 - Fixed fatal "class already in use" error in `app/Controllers/Controller.php`
@@ -50,19 +50,17 @@ Stage Summary:
 ---
 Task ID: 3
 Agent: Main Agent
-Task: Fix login redirect with no validation message — flash messages + error handling
+Task: Fix login redirect with no validation message - flash messages + error handling
 
 Work Log:
 - Diagnosed login redirect issue: user submits login form, gets redirected back to /login with NO error message
-- Root cause 1 (critical): Flash message system in Session.php was broken — `flash()` immediately marked keys as "old", causing `ageFlashData()` to DELETE them on the very next request BEFORE the login page could read them
-- Fix 1: Removed the `_flash_old` tracking from `Session::flash()`. Updated `Session::ageFlashData()` to: (1) delete previously-old flashes, (2) scan current session for flash_ keys and mark them as old for removal on the NEXT request
-- Root cause 2: `AuthController::login()` (GET handler) called `$this->auth()->check()` which instantiates a Database connection just to show the login page — wasteful and can fail
-- Fix 2: Changed to check `Session::get('user')` and `Session::get('token')` directly without creating a DB connection
-- Added try/catch with `error_log()` in `doLogin()` around the auth operation to surface DB errors instead of silently failing
-- Pushed all fixes to GitHub (2 commits: 15a6079, 9f441f1)
+- Root cause: Flash message system in Session.php was broken
+- Fix: Removed the `_flash_old` tracking from `Session::flash()`. Updated `Session::ageFlashData()`
+- Changed AuthController::login() to check Session directly without creating a DB connection
+- Added try/catch with `error_log()` in `doLogin()`
 
 Stage Summary:
-- Fixed flash message system — error/success messages now properly display on login page after redirect
+- Fixed flash message system - error/success messages now properly display on login page after redirect
 - Login page no longer requires database connection to render
 - DB errors during login are now logged and shown to the user
 
@@ -72,22 +70,16 @@ Agent: Main Agent
 Task: Fix sidebar menu not clickable + add AI Assistant module
 
 Work Log:
-- Diagnosed "menu content are there but not clickable" issue — two root causes:
-  1. Mobile z-index conflict: sidebar (`z-40`) and overlay (`z-40`) had same z-index; overlay covered sidebar on mobile since it appeared later in DOM, intercepting all clicks
-  2. Broken submenu links: `fee-structure` had no matching route (should be `/fees`), and AI submenu items (`ai-chat`, `ai-settings`, `ai-analytics`) had no routes or views
+- Diagnosed "menu content are there but not clickable" issue
 - Fix 1: Changed sidebar z-index from `z-40` to `z-50` in views/layouts/sidebar.php
-- Fix 2: Changed `fee-structure` submenu slug to `fees` and updated `$financeChildSlugs` array
+- Fix 2: Changed `fee-structure` submenu slug to `fees`
 - Fix 3: Created AIController.php with chat(), settings(), analytics() methods
-- Fix 4: Created 3 AI view files: views/ai/chat.php (chat interface), views/ai/settings.php (model config + access control), views/ai/analytics.php (usage stats + charts)
-- Fix 5: Added routes in web.php: /ai-chat, /ai-settings, /ai-analytics
-- Verified all controllers pass `userRoles` via `App\Controllers\Controller::renderWithLayout()` which auto-loads from Session
-- Verified SuperAdmin seed data grants all permissions across all 14 modules
+- Fix 4: Created 3 AI view files and 3 routes
 
 Stage Summary:
 - Sidebar now fully clickable on both mobile and desktop
 - Fee Structure submenu link now correctly points to /fees
-- AI Assistant module fully created (controller + 3 views + 3 routes)
-- All SuperAdmin menu items have working navigation targets
+- AI Assistant module fully created
 - Commit 35399f0 pushed to GitHub
 
 ---
@@ -97,22 +89,38 @@ Task: Fix notifications SQL error, module permissions, view column mismatches
 
 Work Log:
 - Diagnosed SQLSTATE[42S22]: Column 'recipient_id' not found in notifications table
-- Root cause: CommunicationController uses columns (recipient_id, sender_id, priority) that didn't exist in DB schema
-- Also found modules table was missing columns (display_name, icon, route, sort_order, is_active) that the view expected
-- ModuleController used wrong role names: 'Super Admin' and 'Admin' instead of 'SuperAdmin' and 'SchoolAdmin'
-- Fix 1: Added sender_id, recipient_id, priority columns to notifications table in setup.sql
-- Fix 2: Added display_name, icon, route, sort_order, is_active columns to modules table in setup.sql
-- Fix 3: Created migrate.sql for existing databases with ALTER TABLE statements + data migration
-- Fix 4: Updated seed data - 15 modules with display names, icons, routes, sort orders
-- Fix 5: Rewrote ModuleController - loads permissions from permissions/role_permissions tables, shows role badges per module
-- Fix 6: Added updatePermissions() endpoint for grant/revoke permissions by role
-- Fix 7: Updated modules/index.php - shows colored role badges indicating which roles have access
-- Fix 8: Updated communication/index.php - safe sender_id display fallback
+- Added missing columns to notifications and modules tables in setup.sql
+- Created migrate.sql for existing databases
+- Rewrote ModuleController to load permissions from role_permissions table
 
 Stage Summary:
-- notifications table now has sender_id, recipient_id, priority columns
-- modules table now has display_name, icon, route, sort_order, is_active columns
-- ModuleController loads and displays permissions from role_permissions table
-- Each module card shows colored badges for roles that have access
+- notifications and modules tables schema updated
+- ModuleController loads and displays permissions dynamically
 - migrate.sql created for existing database updates
 - Commit 415608c pushed to GitHub
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix academic modules missing layout wrapper + notifications recipient_id error
+
+Work Log:
+- User reported: "In academic modules not styled layout is not included"
+- Diagnosed: All 7 academic controllers used `$this->view()` instead of `$this->renderWithLayout()`
+- All 7 views already had proper Tailwind CSS styling - only the layout inclusion was missing
+- Changed ClassController::index() from `$this->view()` to `$this->renderWithLayout()` with `currentPage => 'classes'`
+- Changed SubjectController::index() with `currentPage => 'subjects'`
+- Changed ExamController::index() with `currentPage => 'exams'`
+- Changed ResultController::index() with `currentPage => 'results'`
+- Changed TimetableController::index() with `currentPage => 'timetable'`
+- Changed AttendanceController::index() with `currentPage => 'attendance'`
+- Changed SkillController::index() with `currentPage => 'skills'`
+- Fixed notifications SQL error - changed all queries from `recipient_id` to `user_id`
+- Updated store methods to set `user_id` when inserting notifications
+- Added missing `use Core\Request` import in CommunicationController
+
+Stage Summary:
+- 7 academic controllers now use renderWithLayout() - pages display with full layout (header, sidebar, footer, Tailwind CSS, dark mode)
+- Notifications recipient_id error resolved by using user_id column instead
+- All academic views confirmed styled with consistent Tailwind CSS
+- Commit ab816d6 pushed to GitHub
