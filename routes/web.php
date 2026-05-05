@@ -268,6 +268,13 @@ Router::get('/skills/{id}/edit', 'SkillController@edit');
 Router::post('/skills/{id}', 'SkillController@update');
 Router::post('/skills/{id}/delete', 'SkillController@delete');
 
+// ─── AI Assistant ────────────────────────────────────────────────────────────
+
+Router::get('/ai-chat', 'AIController@chat');
+Router::get('/ai-settings', 'AIController@settings');
+Router::post('/ai-settings', 'AIController@settings');
+Router::get('/ai-analytics', 'AIController@analytics');
+
 // ─── Profile / Settings ──────────────────────────────────────────────────────
 
 Router::get('/profile', 'ProfileController@index');

@@ -106,7 +106,7 @@ $icons = [
 
 // Menu configuration
 $academicChildSlugs = ['classes', 'subjects', 'exams', 'results', 'timetable', 'skills'];
-$financeChildSlugs = ['fee-structure', 'payments'];
+$financeChildSlugs = ['fees', 'payments'];
 $aiChildSlugs = ['ai-chat', 'ai-settings', 'ai-analytics'];
 $academicOpen = isParentActive($currentPage, $academicChildSlugs);
 $financeOpen = isParentActive($currentPage, $financeChildSlugs);
@@ -114,7 +114,7 @@ $aiOpen = isParentActive($currentPage, $aiChildSlugs);
 ?>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] w-64 overflow-y-auto bg-emerald-900 dark:bg-gray-950 sidebar-transition -translate-x-full lg:translate-x-0 border-r border-emerald-800 dark:border-gray-800">
+<aside id="sidebar" class="fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 overflow-y-auto bg-emerald-900 dark:bg-gray-950 sidebar-transition -translate-x-full lg:translate-x-0 border-r border-emerald-800 dark:border-gray-800">
     <div class="flex h-full flex-col">
 
         <!-- Logo / School Brand -->
@@ -192,7 +192,7 @@ $aiOpen = isParentActive($currentPage, $aiChildSlugs);
                 <div class="mt-1">
                     <?= renderSubmenuToggle('submenu-finance', $icons['dollar'], 'Finance', 'submenu-finance-arrow', $currentPage, $financeChildSlugs) ?>
                     <div id="submenu-finance" class="mt-1 ml-4 space-y-0.5 <?= $financeOpen ? '' : 'hidden' ?>">
-                        <?= renderSubmenuItem('fee-structure', $icons['fee-structure'], 'Fee Structure', $currentPage) ?>
+                        <?= renderSubmenuItem('fees', $icons['fee-structure'], 'Fee Structure', $currentPage) ?>
                         <?= renderSubmenuItem('payments', $icons['payments'], 'Payments', $currentPage) ?>
                     </div>
                 </div>
