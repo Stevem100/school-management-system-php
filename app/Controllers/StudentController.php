@@ -130,9 +130,9 @@ class StudentController extends Controller
                 'last_name'  => $this->input('last_name'),
                 'email'      => $this->input('email'),
                 'phone'      => $this->input('phone'),
-                'password'   => password_hash('password123', PASSWORD_DEFAULT),
-                'user_type'  => 'student',
-                'status'     => $this->input('status', 'active'),
+                'passwordHash' => hash('sha256', 'password123' . (string) config('password_salt', '_school_erp_salt')),
+                'userType'    => 'student',
+                'isActive'    => true,
             ]);
 
             // Create student profile
@@ -406,9 +406,9 @@ class StudentController extends Controller
                 'last_name'  => $this->input('last_name'),
                 'email'      => $this->input('email'),
                 'phone'      => $this->input('phone'),
-                'password'   => password_hash('password123', PASSWORD_DEFAULT),
-                'user_type'  => 'student',
-                'status'     => $this->input('status', 'active'),
+                'passwordHash' => hash('sha256', 'password123' . (string) config('password_salt', '_school_erp_salt')),
+                'userType'    => 'student',
+                'isActive'    => true,
             ]);
 
             $profile = $this->db->insert('student_profiles', [

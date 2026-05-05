@@ -138,7 +138,8 @@ class ProfileController extends Controller
                     return;
                 }
 
-                if (!password_verify($currentPassword, $user['password'])) {
+                $hashedCurrent = hash('sha256', $currentPassword . (string) config('password_salt', '_school_erp_salt'));
+                if (!hash_equals($hashedCurrent, (string) ($user['passwordHash'] ?? ''))) {
                     error_msg('Current password is incorrect.');
                     $this->redirect('/profile');
                     return;
@@ -156,7 +157,7 @@ class ProfileController extends Controller
                     return;
                 }
 
-                $data['password'] = password_hash($newPassword, PASSWORD_DEFAULT);
+                $data['passwordHash'] = hash('sha256', $newPassword . (string) config('password_salt', '_school_erp_salt'));
             }
 
             $this->db->updateById('users', $userId, $data);

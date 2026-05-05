@@ -213,7 +213,7 @@ INSERT INTO branches (school_id, name, code, address, phone) VALUES
 -- demo123: 809ca9818040a03b8f923a18dec82588b41a9d89f495e4205b51e7a6b09de083
 -- student123: 10b18736f7330af3305d3c72b233ea6942149e4dd023ec01dbba61de587dbc72
 
-INSERT INTO users (email, password, first_name, last_name, phone, school_id, branch_id) VALUES
+INSERT INTO users (email, password_hash, first_name, last_name, phone, school_id, branch_id) VALUES
   -- id=1: SuperAdmin
   ('admin@school.com', '03b1dbf3638037f717845e3e36e2c5ae0c28a13abef309dd61976f4c40fa2b18', 'Admin', 'User', '+254-700-000001', 1, 2),
   -- id=2: SchoolAdmin

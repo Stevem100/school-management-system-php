@@ -174,10 +174,10 @@ class UserController extends Controller
             'last_name'  => $this->input('last_name'),
             'email'      => $this->input('email'),
             'phone'      => $this->input('phone'),
-            'password'   => password_hash($this->input('password'), PASSWORD_DEFAULT),
-            'school_id'  => $schoolId,
-            'branch_id'  => $branchId,
-            'is_active'  => $this->input('is_active', true),
+            'passwordHash' => hash('sha256', $this->input('password') . (string) config('password_salt', '_school_erp_salt')),
+            'schoolId'    => $schoolId,
+            'branchId'    => $branchId,
+            'isActive'    => $this->input('is_active', true),
         ];
 
         try {
@@ -319,7 +319,7 @@ class UserController extends Controller
         // Update password only if provided
         $password = $this->input('password');
         if (!empty($password)) {
-            $data['password'] = password_hash($password, PASSWORD_DEFAULT);
+            $data['passwordHash'] = hash('sha256', $password . (string) config('password_salt', '_school_erp_salt'));
         }
 
         try {
@@ -442,10 +442,10 @@ class UserController extends Controller
             'last_name'  => $this->input('last_name'),
             'email'      => $this->input('email'),
             'phone'      => $this->input('phone'),
-            'password'   => password_hash($this->input('password'), PASSWORD_DEFAULT),
-            'school_id'  => $this->input('school_id'),
-            'branch_id'  => $this->input('branch_id'),
-            'is_active'  => $this->input('is_active', true),
+            'passwordHash' => hash('sha256', $this->input('password') . (string) config('password_salt', '_school_erp_salt')),
+            'schoolId'    => $this->input('school_id'),
+            'branchId'    => $this->input('branch_id'),
+            'isActive'    => $this->input('is_active', true),
         ];
 
         try {
@@ -493,7 +493,7 @@ class UserController extends Controller
 
         $password = $this->input('password');
         if (!empty($password)) {
-            $data['password'] = password_hash($password, PASSWORD_DEFAULT);
+            $data['passwordHash'] = hash('sha256', $password . (string) config('password_salt', '_school_erp_salt'));
         }
 
         try {
