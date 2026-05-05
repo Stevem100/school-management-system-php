@@ -51,14 +51,19 @@ class UserController extends Controller
         // Enrich users with their roles and school/branch names
         $enrichedUsers = [];
         foreach ($result['data'] as $u) {
-            $roles = $this->db->select('user_roles', ['user_id' => ['eq' => $u['id']]], null, null, null, 'role_id,roles(name,display_name)');
+            // Fetch user roles via raw SQL JOIN
+            $roles = $this->db->raw(
+                "SELECT r.id, r.name
+                 FROM user_roles ur
+                 INNER JOIN roles r ON ur.role_id = r.id
+                 WHERE ur.user_id = ?
+                 ORDER BY r.name ASC",
+                [$u['id']]
+            );
 
             $roleNames = [];
             foreach ($roles as $r) {
-                $role = $r['roles'] ?? null;
-                if ($role) {
-                    $roleNames[] = $role['displayName'] ?? $role['name'] ?? '';
-                }
+                $roleNames[] = $r['name'] ?? '';
             }
 
             $u['roleNames'] = $roleNames;

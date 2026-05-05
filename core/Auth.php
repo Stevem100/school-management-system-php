@@ -81,9 +81,8 @@ class Auth
                 ];
             }
 
-            // Fetch user roles via raw JOIN query (Supabase embedded select syntax
-            // does not work with PDO, so we use a raw SQL JOIN instead)
-            $sql = "SELECT r.name, r.id, r.description, r.permissions
+            // Fetch user roles via raw JOIN query
+            $sql = "SELECT r.name, r.id, r.description, r.scope, r.level
                     FROM user_roles ur
                     INNER JOIN roles r ON ur.role_id = r.id
                     WHERE ur.user_id = ?";
@@ -387,7 +386,7 @@ class Auth
             }
 
             // Fetch roles via raw JOIN query
-            $sql = "SELECT r.name, r.id, r.description, r.permissions
+            $sql = "SELECT r.name, r.id, r.description, r.scope, r.level
                     FROM user_roles ur
                     INNER JOIN roles r ON ur.role_id = r.id
                     WHERE ur.user_id = ?";

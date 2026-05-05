@@ -27,34 +27,29 @@ class RoleController extends Controller
 
         $filters = [];
         if (!empty($search)) {
-            $filters['display_name'] = ['ilike' => '%' . $search . '%'];
+            $filters['name'] = ['ilike' => '%' . $search . '%'];
         }
 
         $result = $this->paginate('roles', $page, $perPage, $filters, 'name.asc');
 
-        // Fetch permissions for each role
+        // Fetch permissions for each role via raw SQL JOIN
         $enrichedRoles = [];
         foreach ($result['data'] as $role) {
-            $permissions = $this->db->select(
-                'role_permissions',
-                ['role_id' => ['eq' => $role['id']]],
-                null, null, null,
-                'permission_id,permissions(name,display_name,module)'
+            $permRows = $this->db->raw(
+                "SELECT p.id, p.name, p.module, p.action, p.description
+                 FROM role_permissions rp
+                 INNER JOIN permissions p ON rp.permission_id = p.id
+                 WHERE rp.role_id = ?
+                 ORDER BY p.module ASC, p.name ASC",
+                [$role['id']]
             );
 
-            $role['permissions'] = [];
-            foreach ($permissions as $p) {
-                $perm = $p['permissions'] ?? null;
-                if ($perm) {
-                    $role['permissions'][] = $perm;
-                }
-            }
-
+            $role['permissions'] = $permRows;
             $enrichedRoles[] = $role;
         }
 
         // Fetch all available modules and permissions for the matrix
-        $modules = $this->db->select('modules', ['is_active' => ['eq' => true]], 'sort_order.asc');
+        $modules = $this->db->select('modules', [], 'name.asc');
         $allPermissions = $this->db->select('permissions', [], 'module.asc,name.asc');
 
         // Group permissions by module
@@ -107,9 +102,8 @@ class RoleController extends Controller
         $this->requireRole(['Super Admin']);
 
         $validation = $this->validate([
-            'name'         => 'required|min:2|max:100',
-            'display_name' => 'required|min:2|max:255',
-            'description'  => 'max:500',
+            'name'        => 'required|min:2|max:100',
+            'description' => 'max:500',
         ]);
 
         if (!$validation['valid']) {
@@ -127,10 +121,9 @@ class RoleController extends Controller
         }
 
         $data = [
-            'name'         => $this->input('name'),
-            'display_name' => $this->input('display_name'),
-            'description'  => $this->input('description'),
-            'scope'        => $this->input('scope', 'global'),
+            'name'        => $this->input('name'),
+            'description' => $this->input('description'),
+            'scope'       => $this->input('scope', 'global'),
         ];
 
         try {
@@ -179,7 +172,7 @@ class RoleController extends Controller
         $page = (int) ($this->input('page', 1) ?? 1);
         $result = $this->paginate('roles', $page, 20, [], 'name.asc');
 
-        $modules = $this->db->select('modules', ['is_active' => ['eq' => true]], 'sort_order.asc');
+        $modules = $this->db->select('modules', [], 'name.asc');
         $allPermissions = $this->db->select('permissions', [], 'module.asc,name.asc');
 
         $permissionsByModule = [];
@@ -229,9 +222,8 @@ class RoleController extends Controller
         }
 
         $validation = $this->validate([
-            'name'         => 'required|min:2|max:100',
-            'display_name' => 'required|min:2|max:255',
-            'description'  => 'max:500',
+            'name'        => 'required|min:2|max:100',
+            'description' => 'max:500',
         ]);
 
         if (!$validation['valid']) {
@@ -241,10 +233,9 @@ class RoleController extends Controller
         }
 
         $data = [
-            'name'         => $this->input('name'),
-            'display_name' => $this->input('display_name'),
-            'description'  => $this->input('description'),
-            'scope'        => $this->input('scope', 'global'),
+            'name'        => $this->input('name'),
+            'description' => $this->input('description'),
+            'scope'       => $this->input('scope', 'global'),
         ];
 
         try {
@@ -288,7 +279,7 @@ class RoleController extends Controller
         }
 
         // Prevent deleting system roles
-        $systemRoles = ['super_admin', 'admin'];
+        $systemRoles = ['SuperAdmin', 'SchoolAdmin'];
         if (in_array($role['name'], $systemRoles)) {
             error_msg('Cannot delete system roles.');
             $this->redirect('/roles');
@@ -321,7 +312,7 @@ class RoleController extends Controller
 
         $filters = [];
         if (!empty($search)) {
-            $filters['display_name'] = ['ilike' => '%' . $search . '%'];
+            $filters['name'] = ['ilike' => '%' . $search . '%'];
         }
         if (!empty($scope)) {
             $filters['scope'] = ['eq' => $scope];
@@ -341,8 +332,7 @@ class RoleController extends Controller
         $this->requireRole(['Super Admin']);
 
         $validation = $this->validate([
-            'name'         => 'required|min:2|max:100',
-            'display_name' => 'required|min:2|max:255',
+            'name'        => 'required|min:2|max:100',
         ]);
 
         if (!$validation['valid']) {
@@ -351,10 +341,9 @@ class RoleController extends Controller
         }
 
         $data = [
-            'name'         => $this->input('name'),
-            'display_name' => $this->input('display_name'),
-            'description'  => $this->input('description'),
-            'scope'        => $this->input('scope', 'global'),
+            'name'        => $this->input('name'),
+            'description' => $this->input('description'),
+            'scope'       => $this->input('scope', 'global'),
         ];
 
         try {
@@ -380,10 +369,9 @@ class RoleController extends Controller
         }
 
         $data = array_filter([
-            'name'         => $this->input('name'),
-            'display_name' => $this->input('display_name'),
-            'description'  => $this->input('description'),
-            'scope'        => $this->input('scope'),
+            'name'        => $this->input('name'),
+            'description' => $this->input('description'),
+            'scope'       => $this->input('scope'),
         ], fn($v) => $v !== null);
 
         try {
