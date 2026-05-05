@@ -67,8 +67,9 @@ class ExamController extends Controller
         // Fetch classes for filter dropdown
         $classes = $this->db->select('classes', [], 'name.asc', 100);
 
-        $this->view('exams.index', [
-            'pageTitle' => 'Exams',
+        $this->renderWithLayout('exams.index', [
+            'pageTitle'   => 'Exams',
+            'currentPage' => 'exams',
             'exams'     => $exams,
             'classes'   => $classes,
             'total'     => $result['total'],

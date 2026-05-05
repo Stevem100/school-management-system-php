@@ -69,8 +69,9 @@ class TimetableController extends Controller
             $selectedTeacherName = trim(($tch['firstName'] ?? '') . ' ' . ($tch['lastName'] ?? ''));
         }
 
-        $this->view('timetable.index', [
+        $this->renderWithLayout('timetable.index', [
             'pageTitle'           => 'Timetable',
+            'currentPage'         => 'timetable',
             'classes'             => $classes,
             'teachers'            => $teachers,
             'subjects'            => $subjects,

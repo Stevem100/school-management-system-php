@@ -58,8 +58,9 @@ class ClassController extends Controller
         }
         unset($class);
 
-        $this->view('classes.index', [
+        $this->renderWithLayout('classes.index', [
             'pageTitle'     => 'Classes',
+            'currentPage'  => 'classes',
             'classes'       => $classes,
             'total'         => $result['total'],
             'page'          => $result['page'],

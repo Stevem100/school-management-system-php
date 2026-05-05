@@ -62,8 +62,9 @@ class AttendanceController extends Controller
             ], 'date.desc', 200);
         }
 
-        $this->view('attendance.index', [
+        $this->renderWithLayout('attendance.index', [
             'pageTitle'     => 'Attendance',
+            'currentPage'  => 'attendance',
             'classes'       => $classes,
             'students'      => $students,
             'attendance'    => $attendance,

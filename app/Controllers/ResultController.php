@@ -94,8 +94,9 @@ class ResultController extends Controller
             $students = $this->db->select('users', ['role' => ['eq' => 'Student'], 'classId' => ['eq' => $classId]], 'firstName.asc', 100);
         }
 
-        $this->view('results.index', [
-            'pageTitle' => 'Exam Results',
+        $this->renderWithLayout('results.index', [
+            'pageTitle'   => 'Exam Results',
+            'currentPage' => 'results',
             'results'   => $results,
             'exams'     => $exams,
             'classes'   => $classes,

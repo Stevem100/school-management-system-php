@@ -39,8 +39,9 @@ class SkillController extends Controller
 
         $result = $this->paginate('skills', $page, $perPage, $filters, 'name.asc');
 
-        $this->view('skills.index', [
-            'pageTitle' => 'Skills',
+        $this->renderWithLayout('skills.index', [
+            'pageTitle'    => 'Skills',
+            'currentPage' => 'skills',
             'skills'    => $result['data'],
             'total'     => $result['total'],
             'page'      => $result['page'],

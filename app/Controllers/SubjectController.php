@@ -39,8 +39,9 @@ class SubjectController extends Controller
 
         $result = $this->paginate('subjects', $page, $perPage, $filters, 'name.asc');
 
-        $this->view('subjects.index', [
+        $this->renderWithLayout('subjects.index', [
             'pageTitle' => 'Subjects',
+            'currentPage'  => 'subjects',
             'subjects'  => $result['data'],
             'total'     => $result['total'],
             'page'      => $result['page'],

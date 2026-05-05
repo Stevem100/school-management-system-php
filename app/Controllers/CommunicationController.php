@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use Core\Session;
+use Core\Request;
 
 /**
  * CommunicationController
@@ -27,12 +28,12 @@ class CommunicationController extends Controller
         $perPage = 20;
 
         $userId = $this->currentUserId();
-        $filters = ['recipient_id' => ['eq' => $userId]];
+        $filters = ['user_id' => ['eq' => $userId]];
 
         $result = $this->paginate('notifications', $page, $perPage, $filters, 'created_at.desc');
 
         $unreadCount = $this->db->count('notifications', [
-            'recipient_id' => ['eq' => $userId],
+            'user_id' => ['eq' => $userId],
             'is_read' => ['eq' => false],
         ]);
 
@@ -102,8 +103,8 @@ class CommunicationController extends Controller
 
         $data = [
             'school_id'   => $this->input('school_id', ''),
+            'user_id'     => $recipientId ?: null,
             'sender_id'   => $this->currentUserId(),
-            'recipient_id' => $recipientId,
             'title'       => $this->input('title'),
             'message'     => $this->input('message'),
             'type'        => $this->input('type', 'message'),
@@ -190,8 +191,8 @@ class CommunicationController extends Controller
 
         $data = [
             'school_id'    => $this->input('school_id', ''),
+            'user_id'      => null,
             'sender_id'    => $this->currentUserId(),
-            'recipient_id' => '',
             'title'        => $this->input('title'),
             'message'      => $this->input('message'),
             'type'         => 'notice',
@@ -284,7 +285,7 @@ class CommunicationController extends Controller
         $perPage = (int) ($this->input('per_page', 20) ?: 20);
 
         $userId = $this->currentUserId();
-        $filters = ['recipient_id' => ['eq' => $userId]];
+        $filters = ['user_id' => ['eq' => $userId]];
 
         if (!empty($search)) {
             $filters['title'] = ['ilike' => '%' . $search . '%'];
@@ -293,7 +294,7 @@ class CommunicationController extends Controller
         $result = $this->paginate('notifications', $page, $perPage, $filters, 'created_at.desc');
 
         $unreadCount = $this->db->count('notifications', [
-            'recipient_id' => ['eq' => $userId],
+            'user_id' => ['eq' => $userId],
             'is_read' => ['eq' => false],
         ]);
 
@@ -324,8 +325,8 @@ class CommunicationController extends Controller
 
         $data = [
             'school_id'    => $this->input('school_id', ''),
+            'user_id'      => $this->input('recipient_id', '') ?: null,
             'sender_id'    => $this->currentUserId(),
-            'recipient_id' => $this->input('recipient_id', ''),
             'title'        => $this->input('title'),
             'message'      => $this->input('message'),
             'type'         => $this->input('type', 'message'),
@@ -411,8 +412,8 @@ class CommunicationController extends Controller
 
         $data = [
             'school_id'    => $this->input('school_id', ''),
+            'user_id'      => null,
             'sender_id'    => $this->currentUserId(),
-            'recipient_id' => '',
             'title'        => $this->input('title'),
             'message'      => $this->input('message'),
             'type'         => 'notice',
